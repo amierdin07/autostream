@@ -266,6 +266,87 @@ class Playlist {
       );
     });
   }
+
+  static duplicate(id, newName, userId) {
+    return new Promise(async (resolve, reject) => {
+      try {
+        const original = await this.findByIdWithVideos(id);
+        if (!original) {
+          return reject(new Error('Playlist not found'));
+        }
+        
+        const duplicatePlaylist = await this.create({
+          name: newName || `${original.name} (Copy)`,
+          description: original.description,
+          is_shuffle: original.is_shuffle,
+          user_id: userId
+        });
+        
+        const newPlaylistId = duplicatePlaylist.id;
+        
+        db.serialize(() => {
+          db.run('BEGIN TRANSACTION');
+          let hasError = false;
+          let completedVideos = 0;
+          
+          const copyAudios = () => {
+            let completedAudios = 0;
+            if (!original.audios || original.audios.length === 0) {
+              db.run('COMMIT', (err) => {
+                if (err) return reject(err);
+                resolve(duplicatePlaylist);
+              });
+            } else {
+              original.audios.forEach((audio) => {
+                db.run(
+                  'INSERT INTO playlist_audios (id, playlist_id, audio_id, position) VALUES (?, ?, ?, ?)',
+                  [uuidv4(), newPlaylistId, audio.id, audio.position],
+                  function(err) {
+                    if (err && !hasError) {
+                      hasError = true;
+                      db.run('ROLLBACK');
+                      return reject(err);
+                    }
+                    completedAudios++;
+                    if (completedAudios === original.audios.length && !hasError) {
+                      db.run('COMMIT', (err) => {
+                        if (err) return reject(err);
+                        resolve(duplicatePlaylist);
+                      });
+                    }
+                  }
+                );
+              });
+            }
+          };
+
+          if (!original.videos || original.videos.length === 0) {
+            copyAudios();
+          } else {
+            original.videos.forEach((video) => {
+              db.run(
+                'INSERT INTO playlist_videos (id, playlist_id, video_id, position) VALUES (?, ?, ?, ?)',
+                [uuidv4(), newPlaylistId, video.id, video.position],
+                function(err) {
+                  if (err && !hasError) {
+                    hasError = true;
+                    db.run('ROLLBACK');
+                    return reject(err);
+                  }
+                  completedVideos++;
+                  if (completedVideos === original.videos.length && !hasError) {
+                    copyAudios();
+                  }
+                }
+              );
+            });
+          }
+        });
+      } catch (err) {
+        reject(err);
+      }
+    });
+  }
 }
 
 module.exports = Playlist;

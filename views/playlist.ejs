@@ -90,6 +90,9 @@
             <button class="p-1 hover:bg-dark-700 rounded transition-colors" onclick="editPlaylist('<%= playlist.id %>')" title="Edit">
               <i class="ti ti-edit text-gray-400 hover:text-white text-sm"></i>
             </button>
+            <button class="p-1 hover:bg-dark-700 rounded transition-colors" onclick="duplicatePlaylist('<%= playlist.id %>', '<%= playlist.name %>')" title="Copy Playlist">
+              <i class="ti ti-copy text-gray-400 hover:text-white text-sm"></i>
+            </button>
             <button class="p-1 hover:bg-dark-700 rounded transition-colors" onclick="deletePlaylist('<%= playlist.id %>', '<%= playlist.name %>')" title="Delete">
               <i class="ti ti-trash text-gray-400 hover:text-red-400 text-sm"></i>
             </button>
@@ -704,6 +707,37 @@ function deletePlaylist(playlistId, playlistName) {
         showToast('Error deleting playlist', 'error');
       });
   }
+}
+
+function duplicatePlaylist(playlistId, playlistName) {
+  const newName = prompt(`Enter name for duplicated playlist:`, `${playlistName} (Copy)`);
+  if (newName === null) return; // User cancelled
+  const trimmedName = newName.trim();
+  if (!trimmedName) {
+    showToast('Please enter a valid playlist name', 'error');
+    return;
+  }
+  
+  fetch(`/api/playlists/${playlistId}/duplicate`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({ name: trimmedName })
+  })
+    .then(response => response.json())
+    .then(data => {
+      if (data.success) {
+        showToast('Playlist duplicated successfully', 'success');
+        location.reload();
+      } else {
+        showToast(data.error || 'Failed to duplicate playlist', 'error');
+      }
+    })
+    .catch(error => {
+      console.error('Error duplicating playlist:', error);
+      showToast('Error duplicating playlist', 'error');
+    });
 }
 
 function submitPlaylist() {

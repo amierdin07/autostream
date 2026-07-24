@@ -4278,6 +4278,24 @@ app.delete('/api/playlists/:id', isAuthenticated, async (req, res) => {
   }
 });
 
+app.post('/api/playlists/:id/duplicate', isAuthenticated, async (req, res) => {
+  try {
+    const { name } = req.body;
+    const playlistId = req.params.id;
+    const playlist = await Playlist.findById(playlistId);
+    if (!playlist || playlist.user_id !== req.session.userId) {
+      return res.status(404).json({ success: false, error: 'Playlist not found' });
+    }
+    
+    const newPlaylist = await Playlist.duplicate(playlistId, name, req.session.userId);
+    res.json({ success: true, message: 'Playlist duplicated successfully', playlist: newPlaylist });
+  } catch (error) {
+    console.error('Error duplicating playlist:', error);
+    res.status(500).json({ success: false, error: 'Failed to duplicate playlist' });
+  }
+});
+
+
 app.post('/api/playlists/:id/videos', isAuthenticated, [
   body('videoId').notEmpty().withMessage('Video ID is required')
 ], async (req, res) => {
