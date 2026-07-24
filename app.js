@@ -2548,8 +2548,9 @@ app.delete('/api/settings/youtube-channel/:id', isAuthenticated, async (req, res
 const { google } = require('googleapis');
 
 function getAppBaseUrl(req) {
-  const protocol = req.headers['x-forwarded-proto'] || req.protocol;
-  const host = req.headers['x-forwarded-host'] || req.get('host');
+  const host = req.headers['x-forwarded-host'] || req.get('host') || '';
+  const isLocal = host.includes('localhost') || host.includes('127.0.0.1');
+  const protocol = isLocal ? (req.headers['x-forwarded-proto'] || req.protocol) : 'https';
   return `${protocol}://${host}`;
 }
 
