@@ -1,4 +1,5 @@
 <% layout('layout') -%>
+<input type="hidden" name="_csrf" value="<%= csrfToken %>">
 
 <div class="flex flex-col md:flex-row md:items-center justify-between mb-6 gap-4">
   <div>
@@ -830,7 +831,7 @@
             const url = '/api/autolive/upload-thumbnails';
             const xhr = new XMLHttpRequest();
             xhr.open('POST', url);
-            xhr.setRequestHeader('x-csrf-token', document.querySelector('input[name="_csrf"]').value);
+            xhr.setRequestHeader('x-csrf-token', document.querySelector('input[name="_csrf"]')?.value || '');
             
             const response = await new Promise((resolve, reject) => {
                 xhr.onload = () => {
@@ -1053,7 +1054,7 @@
         return new Promise((resolve, reject) => {
             const xhr = new XMLHttpRequest();
             xhr.open(method, url);
-            xhr.setRequestHeader('x-csrf-token', document.querySelector('input[name="_csrf"]').value);
+            xhr.setRequestHeader('x-csrf-token', document.querySelector('input[name="_csrf"]')?.value || '');
             xhr.upload.onprogress = (event) => {
                 if (event.lengthComputable) {
                     onProgress(Math.round((event.loaded / event.total) * 100));
@@ -1416,7 +1417,7 @@
         try {
             const response = await fetch(`/api/autolive/${id}/toggle`, {
                 method: 'POST',
-                headers: { 'x-csrf-token': document.querySelector('input[name="_csrf"]').value }
+                headers: { 'x-csrf-token': document.querySelector('input[name="_csrf"]')?.value || '' }
             });
             const result = await response.json();
             if (!result.success) {
@@ -1449,7 +1450,7 @@
         try {
             const response = await fetch(`/api/autolive/${id}`, {
                 method: 'DELETE',
-                headers: { 'x-csrf-token': document.querySelector('input[name="_csrf"]').value }
+                headers: { 'x-csrf-token': document.querySelector('input[name="_csrf"]')?.value || '' }
             });
             const result = await response.json();
             if (result.success) {

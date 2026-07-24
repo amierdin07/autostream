@@ -1035,7 +1035,7 @@ function initCloudModal(type) {
       body.folderId = currentFolderId || '';
       const response = await fetch(config.endpoint, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': document.querySelector('input[name="_csrf"]').value },
+        headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': document.querySelector('input[name="_csrf"]')?.value || '' },
         body: JSON.stringify(body)
       });
       const result = await response.json();
