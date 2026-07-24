@@ -8,7 +8,6 @@ logs/
 *.sqlite
 *.sqlite3
 *.db
-db/
 
 # Local configuration
 .env
