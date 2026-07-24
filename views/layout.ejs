@@ -84,12 +84,7 @@
         <span class="text-gray-600">•</span>
         <span id="mobile-server-clock" class="tabular-nums">--:--:--</span>
       </div>
-      <% if (typeof vpsExpiry !== 'undefined' && vpsExpiry) { %>
-      <div id="mobile-vps-status" class="flex items-center gap-1.5 text-amber-500 text-[10px] sm:text-xs bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20 mr-2">
-        <i class="ti ti-server-cog"></i>
-        <span id="mobile-vps-timer">--:--:--</span>
-      </div>
-      <% } %>
+
       <div id="mobile-separator" class="hidden h-4 w-px bg-gray-600 mr-1"></div>
       <a href="https://donate.youtube101.id/" target="_blank" 
          class="p-2 text-gray-400 hover:text-white transition-colors">
@@ -124,20 +119,10 @@
           <span class="text-xs mt-1">Autolive</span>
           <span class="sidebar-tooltip group-hover:scale-100">Automated Recurring Live</span>
         </a>
-        <a href="/monitor" class="sidebar-icon group <%= active === 'monitor' ? 'bg-primary' : '' %>">
-          <i class="ti ti-activity-heartbeat text-xl"></i>
-          <span class="text-xs mt-1">Monitor</span>
-          <span class="sidebar-tooltip group-hover:scale-100">YouTube Monitor</span>
-        </a>
         <a href="/gallery" class="sidebar-icon group <%= active === 'gallery' ? 'bg-primary' : '' %>">
           <i class="ti ti-video text-xl"></i>
           <span class="text-xs mt-1">Gallery</span>
           <span class="sidebar-tooltip group-hover:scale-100">Video Gallery</span>
-        </a>
-        <a href="/loop" class="sidebar-icon group <%= active === 'loop' ? 'bg-primary' : '' %>">
-          <i class="ti ti-repeat text-xl"></i>
-          <span class="text-xs mt-1">Loop</span>
-          <span class="sidebar-tooltip group-hover:scale-100">Video Loop & Upload</span>
         </a>
         <a href="/playlist" class="sidebar-icon group <%= active === 'playlist' ? 'bg-primary' : '' %>">
           <i class="ti ti-playlist text-xl"></i>
@@ -199,15 +184,7 @@
           <span class="text-gray-600">•</span>
           <span id="server-clock" class="tabular-nums">--:--:--</span>
         </div>
-        <% if (typeof vpsExpiry !== 'undefined' && vpsExpiry) { %>
-        <div id="vps-expiry-display" class="flex items-center gap-2 text-amber-500 text-xs bg-amber-500/10 px-3 py-1.5 rounded-lg border border-amber-500/30 mr-4">
-          <i class="ti ti-server-cog text-sm"></i>
-          <div class="flex flex-col leading-none">
-            <span class="text-[10px] uppercase font-bold opacity-70 mb-0.5">VPS Active</span>
-            <span id="vps-timer-text" class="font-mono">--:--:--:--</span>
-          </div>
-        </div>
-        <% } %>
+
         <div class="h-4 w-px bg-gray-600 mr-4"></div>
         <a href="https://github.com/bangtutorial/streamflow" target="_blank"
           class="p-2 text-gray-400 hover:text-white transition-colors mr-2">
@@ -267,17 +244,9 @@
         <i class="ti ti-bolt"></i>
         <span>Autolive</span>
       </a>
-      <a href="/monitor" class="bottom-nav-item <%= active === 'monitor' ? 'bottom-nav-active' : '' %>">
-        <i class="ti ti-activity-heartbeat"></i>
-        <span>Monitor</span>
-      </a>
       <a href="/gallery" class="bottom-nav-item <%= active === 'gallery' ? 'bottom-nav-active' : '' %>">
         <i class="ti ti-video"></i>
         <span>Gallery</span>
-      </a>
-      <a href="/loop" class="bottom-nav-item <%= active === 'loop' ? 'bottom-nav-active' : '' %>">
-        <i class="ti ti-repeat"></i>
-        <span>Loop</span>
       </a>
       <a href="/playlist" class="bottom-nav-item <%= active === 'playlist' ? 'bottom-nav-active' : '' %>">
         <i class="ti ti-playlist"></i>
@@ -906,38 +875,5 @@
     }
   });
 
-  const vpsExpiryDateStr = <%- JSON.stringify(typeof vpsExpiry !== 'undefined' ? vpsExpiry : null) %>;
-  
-  function updateVPSTimer() {
-    if (!vpsExpiryDateStr) return;
-    
-    const expiry = new Date(vpsExpiryDateStr);
-    const now = new Date(new Date().getTime() + serverTimeOffset);
-    const diff = expiry - now;
-    
-    const desktopTimer = document.getElementById('vps-timer-text');
-    const mobileTimer = document.getElementById('mobile-vps-timer');
-    
-    if (diff <= 0) {
-      if (desktopTimer) desktopTimer.textContent = 'EXPIRED';
-      if (mobileTimer) mobileTimer.textContent = 'EXPIRED';
-      return;
-    }
-    
-    const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-    const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-    const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-    const seconds = Math.floor((diff % (1000 * 60)) / 1000);
-    
-    const timeStr = `${days}d ${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
-    const shortTimeStr = `${days}d ${hours}h`;
-    
-    if (desktopTimer) desktopTimer.textContent = timeStr;
-    if (mobileTimer) mobileTimer.textContent = shortTimeStr;
-  }
 
-  if (vpsExpiryDateStr) {
-    updateVPSTimer();
-    setInterval(updateVPSTimer, 1000);
-  }
 </script>

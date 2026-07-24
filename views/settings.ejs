@@ -33,13 +33,7 @@
         data-tab="about">
         <i class="ti ti-info-circle mr-2"></i>About
       </button>
-      <% if (user.user_role === 'admin') { %>
-      <button
-        class="settings-tab mr-2 py-2 px-4 text-gray-400 hover:text-blue-600 border-b-2 border-transparent hover:border-blue-600 font-medium"
-        data-tab="system">
-        <i class="ti ti-server-cog mr-2"></i>System
-      </button>
-      <% } %>
+
     </div>
   </div>
   
@@ -621,43 +615,7 @@
         </div>
       </div>
     </div>
-    
-    <div id="system-tab" class="settings-content hidden">
-      <div class="bg-gray-800 rounded-lg p-6">
-        <h3 class="text-lg font-semibold mb-6">System Settings</h3>
-        <form id="vps-timer-form" class="space-y-6">
-          <div class="bg-amber-900/20 border border-amber-700/50 rounded-lg p-4 mb-6 sm:max-w-md">
-            <div class="flex items-start gap-3">
-              <i class="ti ti-info-circle text-amber-500 text-xl flex-shrink-0 mt-0.5"></i>
-              <div class="text-sm">
-                <p class="text-amber-500 font-medium mb-1">VPS Active Timer</p>
-                <p class="text-gray-400">Set the expiry date for your VPS active period to show the countdown in the top bar.</p>
-              </div>
-            </div>
-          </div>
-          
-          <div class="space-y-2">
-            <label for="vps-expiry" class="block text-sm font-medium text-gray-300">VPS Expiry Date</label>
-            <div class="relative sm:max-w-md">
-              <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-gray-400">
-                <i class="ti ti-calendar-event"></i>
-              </span>
-              <input type="datetime-local" id="vps-expiry" name="vpsExpiry"
-                class="bg-dark-900 text-white pl-10 pr-4 py-2 rounded-lg block w-full focus:outline-none focus:ring-1 focus:ring-primary border border-gray-700"
-                value="<%= typeof vpsExpiry !== 'undefined' && vpsExpiry ? new Date(vpsExpiry).toISOString().slice(0, 16) : '' %>">
-            </div>
-            <p class="text-xs text-gray-500">Leave empty to hide the timer.</p>
-          </div>
-          
-          <div class="pt-2">
-            <button type="submit" id="save-vps-timer"
-              class="px-4 py-2 bg-primary hover:bg-blue-600 text-white rounded-lg transition-colors">
-              <i class="ti ti-device-floppy mr-2"></i>Save System Settings
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
+
 
   </div>
   
@@ -775,7 +733,7 @@
         });
       });
       const hashTab = window.location.hash.replace('#', '');
-      const validTabs = ['profile', 'security', 'integration', 'logs', 'about', 'system'];
+      const validTabs = ['profile', 'security', 'integration', 'logs', 'about'];
       if (hashTab && validTabs.includes(hashTab)) {
         activateTab(hashTab);
       } else {
@@ -786,40 +744,7 @@
     <% } %>
       }
 
-      // System tab handler
-      const vpsTimerForm = document.getElementById('vps-timer-form');
-      const saveVpsTimerBtn = document.getElementById('save-vps-timer');
-      if (vpsTimerForm) {
-        vpsTimerForm.addEventListener('submit', async (e) => {
-          e.preventDefault();
-          const vpsExpiry = document.getElementById('vps-expiry').value;
-          const originalBtnContent = saveVpsTimerBtn.innerHTML;
-          saveVpsTimerBtn.disabled = true;
-          saveVpsTimerBtn.innerHTML = '<i class="ti ti-loader animate-spin mr-2"></i>Saving...';
-          try {
-            const response = await fetch('/api/settings/system', {
-              method: 'POST',
-              headers: { 
-                'Content-Type': 'application/json',
-                'X-CSRF-Token': '<%= csrfToken %>' 
-              },
-              body: JSON.stringify({ vpsExpiry })
-            });
-            const data = await response.json();
-            if (data.success) {
-              showToast('success', 'System settings saved successfully');
-              setTimeout(() => location.reload(), 1000);
-            } else {
-              showToast('error', data.error || 'Failed to save settings');
-            }
-          } catch(err) {
-            showToast('error', 'An error occurred');
-          } finally {
-            saveVpsTimerBtn.disabled = false;
-            saveVpsTimerBtn.innerHTML = originalBtnContent;
-          }
-        });
-      }
+
     const profileUpload = document.getElementById('profile-upload');
       const profilePreview = document.getElementById('profile-preview');
       const allowedImageTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif'];
