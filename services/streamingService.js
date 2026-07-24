@@ -45,6 +45,7 @@ const MAX_RETRY_DELAY = 30000;
 const HEALTH_CHECK_INTERVAL = 30000;
 const SYNC_INTERVAL = 60000;
 const STREAM_START_TIMEOUT = 15000;
+const YOUTUBE_CHECK_INTERVAL = 300000; // 5 minutes to avoid quota exhaustion
 
 const YOUTUBE_COPY_ALLOWED_VIDEO_CODECS = new Set(['h264']);
 const YOUTUBE_COPY_ALLOWED_AUDIO_CODECS = new Set(['aac', 'mp3']);
@@ -104,12 +105,13 @@ function resolvePublicFilePath(relativePath) {
 }
 
 function isYouTubeDestination(stream) {
-  if (stream && stream.is_youtube_api) {
+  if (!stream) return false;
+  if (stream.is_youtube_api) {
     return true;
   }
 
   const rtmpUrl = (stream.rtmp_url || '').toLowerCase();
-  return rtmpUrl.includes('youtube.com');
+  return rtmpUrl.includes('youtube.com') || rtmpUrl.includes('googlevideo.com') || rtmpUrl.includes('rtmp.youtube');
 }
 
 function isProgressLogLine(line) {
@@ -147,6 +149,15 @@ function createUnsupportedCopyModeError(message) {
   return error;
 }
 
+function getH264Level(resolution) {
+  if (!resolution) return '4.1';
+  const [width, height] = resolution.split('x').map(Number);
+  if (width > 1920 || height > 1080) {
+    return '5.1'; // Supports up to 4K @ 30fps
+  }
+  return '4.1';
+}
+
 function getRelevantStartupLog(line) {
   const trimmed = (line || '').trim();
   if (!trimmed || isProgressLogLine(trimmed)) {
@@ -174,6 +185,101 @@ function buildStartupFailureMessage(startupState, fallbackMessage = null) {
   }
 
   return 'FFmpeg gagal memulai stream';
+}
+
+function sanitizeDiagnosticLog(message) {
+  const text = String(message || '').trim();
+  if (!text || text.startsWith('Starting FFmpeg process with args:')) {
+    return null;
+  }
+
+  return text.replace(/(rtmps?:\/\/[^/\s]+\/[^/\s]+\/)[^\s]+/gi, '$1[stream-key-hidden]');
+}
+
+function getRecentDiagnosticLogs(streamId, limit = 8) {
+  return getStreamLogs(streamId)
+    .map(log => ({
+      timestamp: log.timestamp,
+      message: sanitizeDiagnosticLog(log.message)
+    }))
+    .filter(log => log.message)
+    .slice(-limit);
+}
+
+function buildFailureDiagnostics(streamId, error) {
+  const message = (error && error.message ? error.message : String(error || '')).trim();
+  const lower = message.toLowerCase();
+  let reason = message || 'Penyebab belum diketahui';
+  let suggestion = 'Cek log FFmpeg terbaru di bawah, lalu coba start ulang setelah penyebabnya diperbaiki.';
+
+  if (/missing rtmp url|stream key/i.test(message)) {
+    reason = 'RTMP URL atau stream key belum diisi.';
+    suggestion = 'Buka edit stream, pastikan RTMP URL dan stream key sudah benar.';
+  } else if (/no video attached|video not found|playlist is empty|video file not found|missing media filepath/i.test(message)) {
+    reason = 'Video atau playlist sumber tidak siap.';
+    suggestion = 'Pilih video/playlist yang masih ada di Gallery, dan pastikan playlist tidak kosong.';
+  } else if (/unsupported_copy_mode_media|tidak kompatibel|codec|pixel format|frame rate/i.test(`${error && error.code ? error.code : ''} ${message}`)) {
+    reason = 'Format video/audio tidak cocok untuk copy mode YouTube.';
+    suggestion = 'Aktifkan Advanced Settings agar stream di-encode ulang, atau gunakan media H.264 + AAC dengan pixel format yuv420p.';
+  } else if (/connection refused|connection reset|timed out|timeout|network is unreachable|could not resolve|name or service not known|no route to host/i.test(message)) {
+    reason = 'Koneksi ke server RTMP gagal.';
+    suggestion = 'Periksa internet/VPS, RTMP URL, firewall, dan apakah endpoint tujuan sedang aktif.';
+  } else if (/403|401|unauthorized|forbidden|authentication|permission|invalid stream key/i.test(lower)) {
+    reason = 'RTMP tujuan menolak koneksi, biasanya karena stream key salah atau tidak punya izin.';
+    suggestion = 'Ambil ulang stream key dari platform tujuan, tempel ulang, lalu coba start lagi.';
+  } else if (/broken pipe|input\/output error|could not write header|server returned|av_interleaved_write_frame/i.test(lower)) {
+    reason = 'Server RTMP menolak data stream saat FFmpeg mulai mengirim.';
+    suggestion = 'Cek stream key, status live room di platform tujuan, dan pengaturan format output.';
+  } else if (/no such file|invalid data found|moov atom not found|error opening input|permission denied/i.test(lower)) {
+    reason = 'File media tidak bisa dibaca oleh FFmpeg.';
+    suggestion = 'Pastikan file masih ada, tidak rusak, dan dapat diputar dari Gallery.';
+  } else if (/spawn .*enoent|enoent/i.test(lower)) {
+    reason = 'Binary FFmpeg tidak ditemukan atau tidak bisa dijalankan.';
+    suggestion = 'Pastikan dependency FFmpeg terpasang dan path FFmpeg valid di server.';
+  }
+
+  return {
+    reason,
+    suggestion,
+    rawError: message,
+    logs: getRecentDiagnosticLogs(streamId)
+  };
+}
+
+function buildStopOptions(reason, message = null) {
+  return {
+    stopReason: reason || 'unknown',
+    stopMessage: message || getDefaultStopMessage(reason)
+  };
+}
+
+function getDefaultStopMessage(reason) {
+  switch (reason) {
+    case 'user_stop':
+      return 'Live dihentikan oleh user dari aplikasi.';
+    case 'scheduled_end':
+      return 'Live berhenti karena jadwal selesai.';
+    case 'schedule_cancelled':
+      return 'Jadwal live dibatalkan oleh user.';
+    case 'ffmpeg_exit':
+      return 'Proses FFmpeg berhenti di luar perintah stop.';
+    case 'ffmpeg_max_retries':
+      return 'Proses FFmpeg gagal terus dan mencapai batas retry.';
+    case 'app_process_missing':
+      return 'Aplikasi tidak menemukan proses FFmpeg untuk live ini.';
+    case 'youtube_ended':
+      return 'YouTube melaporkan live sudah berhenti, sementara proses lokal masih terdeteksi.';
+    case 'startup_resume_expired':
+      return 'Aplikasi restart setelah jadwal live selesai.';
+    case 'start_failed':
+      return 'Live gagal dimulai.';
+    default:
+      return 'Live berhenti, penyebab detail belum diketahui.';
+  }
+}
+
+function buildFfmpegStopMessage(code, signal) {
+  return `FFmpeg berhenti tanpa perintah stop. code=${code === null ? 'null' : code}, signal=${signal || 'none'}.`;
 }
 
 function runFFprobe(filePath) {
@@ -285,27 +391,51 @@ function validatePlaylistCopyConsistency(referenceStream, currentStream, label) 
 }
 
 async function validateCopyModeCompatibility(stream) {
-  return validateCopyModeCompatibilityForInput({
+  const streamWithVideo = await Stream.getStreamWithVideo(stream.id);
+  if (!streamWithVideo) {
+    return;
+  }
+
+  await validateCopyModeCompatibilityForInput({
     videoId: stream.video_id,
+    videoType: streamWithVideo.video_type,
     useAdvancedSettings: stream.use_advanced_settings,
     isYouTubeApi: stream.is_youtube_api,
-    rtmpUrl: stream.rtmp_url
+    rtmpUrl: stream.rtmp_url,
+    streamId: stream.id
   });
 }
 
 async function validateCopyModeCompatibilityForInput({
   videoId,
+  videoType = null,
   useAdvancedSettings = false,
   isYouTubeApi = false,
-  rtmpUrl = ''
+  rtmpUrl = '',
+  streamId = null
 }) {
   if (useAdvancedSettings || !isYouTubeDestination({ is_youtube_api: isYouTubeApi, rtmp_url: rtmpUrl })) {
     return;
   }
 
-  const playlist = await Playlist.findByIdWithVideos(videoId);
+  const playlist = (videoType === 'playlist' || videoType === null) 
+    ? await Playlist.findByIdWithVideos(videoId)
+    : null;
 
   if (playlist) {
+    if (streamId && streamId.startsWith('autolive_')) {
+      try {
+        const Autolive = require('../models/Autolive');
+        const seriesId = streamId.replace('autolive_', '');
+        const series = await Autolive.findById(seriesId);
+        if (series && series.is_random_video === 1 && series.current_video_id) {
+          playlist.videos = playlist.videos.filter(v => v.id === series.current_video_id);
+        }
+      } catch (e) {
+        console.error('[StreamingService] Error loading autolive series for validation:', e);
+      }
+    }
+
     if (!playlist.videos || playlist.videos.length === 0) {
       throw new Error('Playlist is empty');
     }
@@ -333,14 +463,28 @@ async function validateCopyModeCompatibilityForInput({
       }
     }
 
-    for (let index = 0; index < (playlist.audios || []).length; index++) {
-      const audio = playlist.audios[index];
-      const probeData = await runFFprobe(resolvePublicFilePath(audio.filepath));
-      const label = buildMediaLabel(audio, index, 'Audio');
-      const compatibilityError = validateYouTubeCopyAudioProbe(probeData, label);
+    const track1Audios = (playlist.audios || []).filter(a => (a.track_number || 1) === 1);
+    const track2Audios = (playlist.audios || []).filter(a => a.track_number === 2);
+    
+    const hasTrack1 = track1Audios.length > 0;
+    const hasTrack2 = track2Audios.length > 0;
+    const vol1 = playlist.audio_track1_volume !== undefined ? playlist.audio_track1_volume : 1.0;
+    const vol2 = playlist.audio_track2_volume !== undefined ? playlist.audio_track2_volume : 1.0;
 
-      if (compatibilityError) {
-        throw createUnsupportedCopyModeError(compatibilityError);
+    const needsAudioProcessing = (hasTrack1 && hasTrack2) || 
+                                 (hasTrack1 && vol1 !== 1.0) || 
+                                 (hasTrack2 && vol2 !== 1.0);
+
+    if (!needsAudioProcessing) {
+      for (let index = 0; index < (playlist.audios || []).length; index++) {
+        const audio = playlist.audios[index];
+        const probeData = await runFFprobe(resolvePublicFilePath(audio.filepath));
+        const label = buildMediaLabel(audio, index, 'Audio');
+        const compatibilityError = validateYouTubeCopyAudioProbe(probeData, label);
+
+        if (compatibilityError) {
+          throw createUnsupportedCopyModeError(compatibilityError);
+        }
       }
     }
 
@@ -398,6 +542,22 @@ function waitForStreamStartup(streamId, ffmpegProcess, startupState) {
 }
 
 async function buildFFmpegArgsForPlaylist(stream, playlist) {
+  if (stream.id && stream.id.startsWith('autolive_')) {
+    try {
+      const Autolive = require('../models/Autolive');
+      const seriesId = stream.id.replace('autolive_', '');
+      const series = await Autolive.findById(seriesId);
+      if (series && series.is_random_video === 1 && series.current_video_id) {
+        const filtered = playlist.videos.filter(v => v.id === series.current_video_id);
+        if (filtered.length > 0) {
+          playlist.videos = filtered;
+        }
+      }
+    } catch (e) {
+      console.error('[StreamingService] Error loading autolive series for buildFFmpegArgs:', e);
+    }
+  }
+
   if (!playlist.videos || playlist.videos.length === 0) {
     throw new Error('Playlist is empty');
   }
@@ -436,7 +596,9 @@ async function buildFFmpegArgsForPlaylist(stream, playlist) {
   const hasAudio = playlist.audios && playlist.audios.length > 0;
 
   if (!hasAudio) {
+    const isYT = isYouTubeDestination(stream);
     if (!stream.use_advanced_settings) {
+      addStreamLog(stream.id, "Mode: COPY (Advanced Settings Off)");
       return [
         '-nostdin',
         '-loglevel', 'warning',
@@ -448,17 +610,18 @@ async function buildFFmpegArgsForPlaylist(stream, playlist) {
         '-safe', '0',
         '-i', concatFile,
         '-c:v', 'copy',
-        '-c:a', 'copy',
-        '-bsf:a', 'aac_adtstoasc',
+        '-an',
         '-f', 'flv',
         '-flvflags', 'no_duration_filesize',
         rtmpUrl
       ];
     }
 
+    addStreamLog(stream.id, `Mode: ENCODE (YouTube or Advanced Settings On). FPS: ${stream.fps || 30}`);
     const resolution = stream.resolution || '1280x720';
     const bitrate = stream.bitrate || 2500;
     const fps = stream.fps || 30;
+    const preset = stream.use_advanced_settings ? 'veryfast' : 'ultrafast';
 
     return [
       '-nostdin',
@@ -471,17 +634,19 @@ async function buildFFmpegArgsForPlaylist(stream, playlist) {
       '-safe', '0',
       '-i', concatFile,
       '-c:v', 'libx264',
-      '-preset', 'veryfast',
+      '-threads', '2',
+      '-preset', preset,
       '-tune', 'zerolatency',
       '-profile:v', 'high',
-      '-level', '4.1',
+      '-level', getH264Level(resolution),
       '-b:v', `${bitrate}k`,
       '-maxrate', `${Math.round(bitrate * 1.1)}k`,
       '-bufsize', `${bitrate * 2}k`,
       '-pix_fmt', 'yuv420p',
-      '-g', String(fps * 2),
-      '-keyint_min', String(fps),
+      '-g', String(Math.max(parseInt(fps) * 2, 2)),
+      '-keyint_min', String(Math.max(parseInt(fps), 1)),
       '-sc_threshold', '0',
+      '-x264-params', `keyint=${Math.max(parseInt(fps) * 2, 2)}:min-keyint=${Math.max(parseInt(fps), 1)}:scenecut=0`,
       '-s', resolution,
       '-r', String(fps),
       '-c:a', 'aac',
@@ -494,28 +659,99 @@ async function buildFFmpegArgsForPlaylist(stream, playlist) {
     ];
   }
 
-  let audioPaths = [];
-  const audios = playlist.is_shuffle ? shuffleArray(playlist.audios) : playlist.audios;
+  const track1Audios = (playlist.audios || []).filter(a => (a.track_number || 1) === 1);
+  const track2Audios = (playlist.audios || []).filter(a => a.track_number === 2);
+  
+  const hasTrack1 = track1Audios.length > 0;
+  const hasTrack2 = track2Audios.length > 0;
+  const vol1 = playlist.audio_track1_volume !== undefined && playlist.audio_track1_volume !== null ? playlist.audio_track1_volume : 1.0;
+  const vol2 = playlist.audio_track2_volume !== undefined && playlist.audio_track2_volume !== null ? playlist.audio_track2_volume : 1.0;
 
-  for (const audio of audios) {
-    const relPath = audio.filepath.startsWith('/') ? audio.filepath.substring(1) : audio.filepath;
-    const fullPath = path.join(projectRoot, 'public', relPath);
-    if (!fs.existsSync(fullPath)) {
-      throw new Error(`Audio file not found: ${fullPath}`);
+  const needsAudioProcessing = (hasTrack1 && hasTrack2) || 
+                               (hasTrack1 && vol1 !== 1.0) || 
+                               (hasTrack2 && vol2 !== 1.0);
+
+  let audioConcatFiles = [];
+  let currentInputIndex = 1;
+
+  if (hasTrack1) {
+    const audioConcatFile1 = path.join(tempDir, `playlist_audio_${stream.id}_t1.txt`);
+    let audioContent1 = '';
+    const t1Audios = playlist.is_shuffle ? shuffleArray(track1Audios) : track1Audios;
+    for (let i = 0; i < 10000; i++) {
+      for (const audio of t1Audios) {
+        const relPath = audio.filepath.startsWith('/') ? audio.filepath.substring(1) : audio.filepath;
+        const fullPath = path.join(projectRoot, 'public', relPath);
+        if (!fs.existsSync(fullPath)) {
+          throw new Error(`Track 1 Audio file not found: ${fullPath}`);
+        }
+        audioContent1 += `file '${fullPath.replace(/\\/g, '/')}'\n`;
+      }
     }
-    audioPaths.push(fullPath);
+    fs.writeFileSync(audioConcatFile1, audioContent1);
+    audioConcatFiles.push({
+      filePath: audioConcatFile1,
+      inputIndex: currentInputIndex++,
+      volume: vol1
+    });
   }
 
-  const audioConcatFile = path.join(tempDir, `playlist_audio_${stream.id}.txt`);
-  let audioContent = '';
-  for (let i = 0; i < 10000; i++) {
-    for (const ap of audioPaths) {
-      audioContent += `file '${ap.replace(/\\/g, '/')}'\n`;
+  if (hasTrack2) {
+    const audioConcatFile2 = path.join(tempDir, `playlist_audio_${stream.id}_t2.txt`);
+    let audioContent2 = '';
+    const t2Audios = playlist.is_shuffle ? shuffleArray(track2Audios) : track2Audios;
+    for (let i = 0; i < 10000; i++) {
+      for (const audio of t2Audios) {
+        const relPath = audio.filepath.startsWith('/') ? audio.filepath.substring(1) : audio.filepath;
+        const fullPath = path.join(projectRoot, 'public', relPath);
+        if (!fs.existsSync(fullPath)) {
+          throw new Error(`Track 2 Audio file not found: ${fullPath}`);
+        }
+        audioContent2 += `file '${fullPath.replace(/\\/g, '/')}'\n`;
+      }
     }
+    fs.writeFileSync(audioConcatFile2, audioContent2);
+    audioConcatFiles.push({
+      filePath: audioConcatFile2,
+      inputIndex: currentInputIndex++,
+      volume: vol2
+    });
   }
-  fs.writeFileSync(audioConcatFile, audioContent);
 
-  if (!stream.use_advanced_settings) {
+  if (!needsAudioProcessing) {
+    const isYT = isYouTubeDestination(stream);
+    const audioConcatFile = audioConcatFiles[0]?.filePath || '';
+    
+    if (!stream.use_advanced_settings) {
+      return [
+        '-nostdin',
+        '-loglevel', 'warning',
+        '-stats',
+        '-re',
+        '-fflags', '+genpts+igndts+discardcorrupt',
+        '-avoid_negative_ts', 'make_zero',
+        '-f', 'concat',
+        '-safe', '0',
+        '-i', concatFile,
+        '-re',
+        '-f', 'concat',
+        '-safe', '0',
+        '-i', audioConcatFile,
+        '-map', '0:v:0',
+        '-map', '1:a:0',
+        '-c:v', 'copy',
+        '-c:a', 'copy',
+        '-f', 'flv',
+        '-flvflags', 'no_duration_filesize',
+        rtmpUrl
+      ];
+    }
+
+    const resolution = stream.resolution || '1280x720';
+    const bitrate = stream.bitrate || 2500;
+    const fps = stream.fps || 30;
+    const preset = stream.use_advanced_settings ? 'veryfast' : 'ultrafast';
+
     return [
       '-nostdin',
       '-loglevel', 'warning',
@@ -532,7 +768,22 @@ async function buildFFmpegArgsForPlaylist(stream, playlist) {
       '-i', audioConcatFile,
       '-map', '0:v:0',
       '-map', '1:a:0',
-      '-c:v', 'copy',
+      '-c:v', 'libx264',
+      '-threads', '2',
+      '-preset', preset,
+      '-tune', 'zerolatency',
+      '-profile:v', 'high',
+      '-level', getH264Level(resolution),
+      '-b:v', `${bitrate}k`,
+      '-maxrate', `${Math.round(bitrate * 1.1)}k`,
+      '-bufsize', `${bitrate * 2}k`,
+      '-pix_fmt', 'yuv420p',
+      '-g', String(Math.max(parseInt(fps) * 2, 2)),
+      '-keyint_min', String(Math.max(parseInt(fps), 1)),
+      '-sc_threshold', '0',
+      '-x264-params', `keyint=${Math.max(parseInt(fps) * 2, 2)}:min-keyint=${Math.max(parseInt(fps), 1)}:scenecut=0`,
+      '-s', resolution,
+      '-r', String(fps),
       '-c:a', 'copy',
       '-f', 'flv',
       '-flvflags', 'no_duration_filesize',
@@ -540,11 +791,17 @@ async function buildFFmpegArgsForPlaylist(stream, playlist) {
     ];
   }
 
-  const resolution = stream.resolution || '1280x720';
-  const bitrate = stream.bitrate || 2500;
-  const fps = stream.fps || 30;
+  // Processing is needed (mixing or volume adjustments) -> encode audio to AAC
+  let filterComplex = '';
+  if (audioConcatFiles.length === 1) {
+    filterComplex = `[${audioConcatFiles[0].inputIndex}:a]volume=${audioConcatFiles[0].volume}[outa]`;
+  } else if (audioConcatFiles.length === 2) {
+    filterComplex = `[${audioConcatFiles[0].inputIndex}:a]volume=${audioConcatFiles[0].volume}[a1];` +
+                    `[${audioConcatFiles[1].inputIndex}:a]volume=${audioConcatFiles[1].volume}[a2];` +
+                    `[a1][a2]amix=inputs=2:duration=longest:dropout_transition=0[outa]`;
+  }
 
-  return [
+  const args = [
     '-nostdin',
     '-loglevel', 'warning',
     '-stats',
@@ -553,32 +810,70 @@ async function buildFFmpegArgsForPlaylist(stream, playlist) {
     '-avoid_negative_ts', 'make_zero',
     '-f', 'concat',
     '-safe', '0',
-    '-i', concatFile,
-    '-re',
-    '-f', 'concat',
-    '-safe', '0',
-    '-i', audioConcatFile,
+    '-i', concatFile
+  ];
+
+  for (const acf of audioConcatFiles) {
+    args.push(
+      '-re',
+      '-f', 'concat',
+      '-safe', '0',
+      '-i', acf.filePath
+    );
+  }
+
+  args.push(
+    '-filter_complex', filterComplex,
     '-map', '0:v:0',
-    '-map', '1:a:0',
+    '-map', '[outa]'
+  );
+
+  if (!stream.use_advanced_settings) {
+    args.push(
+      '-c:v', 'copy',
+      '-c:a', 'aac',
+      '-b:a', '192k',
+      '-ar', '44100',
+      '-ac', '2',
+      '-f', 'flv',
+      '-flvflags', 'no_duration_filesize',
+      rtmpUrl
+    );
+    return args;
+  }
+
+  const resolution = stream.resolution || '1280x720';
+  const bitrate = stream.bitrate || 2500;
+  const fps = stream.fps || 30;
+  const preset = 'veryfast';
+
+  args.push(
     '-c:v', 'libx264',
-    '-preset', 'veryfast',
+    '-threads', '2',
+    '-preset', preset,
     '-tune', 'zerolatency',
     '-profile:v', 'high',
-    '-level', '4.1',
+    '-level', getH264Level(resolution),
     '-b:v', `${bitrate}k`,
     '-maxrate', `${Math.round(bitrate * 1.1)}k`,
     '-bufsize', `${bitrate * 2}k`,
     '-pix_fmt', 'yuv420p',
-    '-g', String(fps * 2),
-    '-keyint_min', String(fps),
+    '-g', String(Math.max(parseInt(fps) * 2, 2)),
+    '-keyint_min', String(Math.max(parseInt(fps), 1)),
     '-sc_threshold', '0',
+    '-x264-params', `keyint=${Math.max(parseInt(fps) * 2, 2)}:min-keyint=${Math.max(parseInt(fps), 1)}:scenecut=0`,
     '-s', resolution,
     '-r', String(fps),
-    '-c:a', 'copy',
+    '-c:a', 'aac',
+    '-b:a', '192k',
+    '-ar', '44100',
+    '-ac', '2',
     '-f', 'flv',
     '-flvflags', 'no_duration_filesize',
     rtmpUrl
-  ];
+  );
+  
+  return args;
 }
 
 async function buildFFmpegArgs(stream) {
@@ -608,8 +903,12 @@ async function buildFFmpegArgs(stream) {
   const rtmpUrl = `${stream.rtmp_url.replace(/\/$/, '')}/${stream.stream_key}`;
   const loopValue = stream.loop_video ? '-1' : '0';
 
+  const isYT = isYouTubeDestination(stream);
   if (!stream.use_advanced_settings) {
-    return [
+    const probeData = await runFFprobe(videoPath);
+    const hasAudio = !!getPrimaryStream(probeData, 'audio');
+
+    const args = [
       '-nostdin',
       '-loglevel', 'warning',
       '-stats',
@@ -619,17 +918,29 @@ async function buildFFmpegArgs(stream) {
       '-stream_loop', loopValue,
       '-i', videoPath,
       '-c:v', 'copy',
-      '-c:a', 'copy',
-      '-bsf:a', 'aac_adtstoasc',
+      hasAudio ? '-c:a' : '-an'
+    ];
+
+    if (hasAudio) {
+      args.push('copy');
+    }
+
+    args.push(
       '-f', 'flv',
       '-flvflags', 'no_duration_filesize',
       rtmpUrl
-    ];
+    );
+
+    return args;
   }
 
   const resolution = stream.resolution || '1280x720';
   const bitrate = stream.bitrate || 2500;
   const fps = stream.fps || 30;
+  const preset = stream.use_advanced_settings ? 'veryfast' : 'ultrafast';
+  
+  const probeData = await runFFprobe(videoPath);
+  const hasAudio = !!getPrimaryStream(probeData, 'audio');
 
   return [
     '-nostdin',
@@ -641,27 +952,33 @@ async function buildFFmpegArgs(stream) {
     '-stream_loop', loopValue,
     '-i', videoPath,
     '-c:v', 'libx264',
-    '-preset', 'veryfast',
+    '-threads', '2',
+    '-preset', preset,
     '-tune', 'zerolatency',
     '-profile:v', 'high',
-    '-level', '4.1',
+    '-level', getH264Level(resolution),
     '-b:v', `${bitrate}k`,
     '-maxrate', `${Math.round(bitrate * 1.1)}k`,
     '-bufsize', `${bitrate * 2}k`,
     '-pix_fmt', 'yuv420p',
-    '-g', String(fps * 2),
-    '-keyint_min', String(fps),
+    '-g', String(Math.max(parseInt(fps) * 2, 2)),
+    '-keyint_min', String(Math.max(parseInt(fps), 1)),
     '-sc_threshold', '0',
+    '-x264-params', `keyint=${Math.max(parseInt(fps) * 2, 2)}:min-keyint=${Math.max(parseInt(fps), 1)}:scenecut=0`,
     '-s', resolution,
     '-r', String(fps),
-    '-c:a', 'aac',
-    '-b:a', '128k',
-    '-ar', '44100',
-    '-ac', '2',
+    hasAudio ? '-c:a' : '-an',
+    hasAudio ? 'aac' : null,
+    hasAudio ? '-b:a' : null,
+    hasAudio ? '128k' : null,
+    hasAudio ? '-ar' : null,
+    hasAudio ? '44100' : null,
+    hasAudio ? '-ac' : null,
+    hasAudio ? '2' : null,
     '-f', 'flv',
     '-flvflags', 'no_duration_filesize',
     rtmpUrl
-  ];
+  ].filter(arg => arg !== null);
 }
 
 
@@ -746,7 +1063,7 @@ async function startStream(streamId, isRetry = false, baseUrl = null) {
 
     if (stream.is_youtube_api) {
       const youtubeService = require('./youtubeService');
-      const effectiveBaseUrl = baseUrl || process.env.BASE_URL || 'http://localhost:7575';
+      const effectiveBaseUrl = (baseUrl && !baseUrl.includes('localhost')) ? baseUrl : (process.env.BASE_URL || 'http://localhost:7575');
 
       addStreamLog(streamId, 'Creating YouTube broadcast...');
 
@@ -759,8 +1076,9 @@ async function startStream(streamId, isRetry = false, baseUrl = null) {
         stream = await Stream.findById(streamId);
         addStreamLog(streamId, `YouTube broadcast created: ${ytResult.broadcastId}`);
       } catch (ytError) {
-        addStreamLog(streamId, `YouTube API error: ${ytError.message}`);
-        throw ytError;
+        const betterError = youtubeService.handleYoutubeError(ytError, `(Stream: ${stream.title})`);
+        addStreamLog(streamId, `YouTube API error: ${betterError.message}`);
+        throw betterError;
       }
     }
 
@@ -770,7 +1088,7 @@ async function startStream(streamId, isRetry = false, baseUrl = null) {
 
     const ffmpegArgs = await buildFFmpegArgs(stream);
 
-    addStreamLog(streamId, `Starting FFmpeg process`);
+    addStreamLog(streamId, `Starting FFmpeg process with args: ${ffmpegArgs.join(' ')}`);
 
     const ffmpegProcess = spawn(ffmpegPath, ffmpegArgs, {
       detached: false,
@@ -868,7 +1186,7 @@ async function startStream(streamId, isRetry = false, baseUrl = null) {
           addStreamLog(streamId, 'Stream ended - scheduled end time reached');
           if (wasActive) {
             try {
-              await Stream.updateStatus(streamId, 'offline', currentStream.user_id);
+              await transitionStreamToDone(streamId, currentStream.user_id, buildStopOptions('scheduled_end'));
               if (schedulerService) {
                 schedulerService.handleStreamStopped(streamId);
               }
@@ -899,14 +1217,14 @@ async function startStream(streamId, isRetry = false, baseUrl = null) {
                   const endTime = new Date(latestStream.end_time);
                   const now = new Date();
                   if (endTime.getTime() <= now.getTime()) {
-                    await Stream.updateStatus(streamId, 'offline', latestStream.user_id);
+                    await transitionStreamToDone(streamId, latestStream.user_id, buildStopOptions('scheduled_end'));
                     cleanupStreamData(streamId);
                     return;
                   }
                 }
                 const result = await startStream(streamId, true, baseUrl);
                 if (!result.success) {
-                  await Stream.updateStatus(streamId, 'offline', latestStream.user_id);
+                  await transitionStreamToDone(streamId, latestStream.user_id, buildStopOptions('start_failed', result.error || 'Retry start stream gagal.'));
                   cleanupStreamData(streamId);
                 }
               } else {
@@ -924,7 +1242,9 @@ async function startStream(streamId, isRetry = false, baseUrl = null) {
 
       if (wasActive && currentStream) {
         try {
-          await Stream.updateStatus(streamId, 'offline', currentStream.user_id);
+          const retryCount = streamRetryCount.get(streamId) || 0;
+          const reason = retryCount >= MAX_RETRY_ATTEMPTS ? 'ffmpeg_max_retries' : 'ffmpeg_exit';
+          await transitionStreamToDone(streamId, currentStream.user_id, buildStopOptions(reason, buildFfmpegStopMessage(code, signal)));
           if (schedulerService) {
             schedulerService.handleStreamStopped(streamId);
           }
@@ -941,7 +1261,7 @@ async function startStream(streamId, isRetry = false, baseUrl = null) {
       }
       activeStreams.delete(streamId);
       try {
-        await Stream.updateStatus(streamId, 'offline', stream.user_id);
+        await Stream.updateStatus(streamId, 'offline', stream.user_id, buildStopOptions('ffmpeg_exit', `Process error: ${err.message}`));
       } catch (e) { }
       cleanupStreamData(streamId);
     });
@@ -975,15 +1295,26 @@ async function startStream(streamId, isRetry = false, baseUrl = null) {
     };
   } catch (error) {
     addStreamLog(streamId, `Start failed: ${error.message}`);
+    const diagnostics = buildFailureDiagnostics(streamId, error);
     try {
       const currentStream = await Stream.findById(streamId);
       if (currentStream) {
-        await Stream.updateStatus(streamId, 'offline', currentStream.user_id);
+        await Stream.updateStatus(streamId, 'offline', currentStream.user_id, {
+          stopReason: 'start_failed',
+          stopMessage: diagnostics.reason || error.message
+        });
       }
     } catch (e) {
       console.error(`Failed to update stream status on start failure:`, e.message);
     }
-    return { success: false, error: error.message, code: error.code || null };
+    return {
+      success: false,
+      error: diagnostics.reason || error.message,
+      details: diagnostics.rawError,
+      suggestion: diagnostics.suggestion,
+      logs: diagnostics.logs,
+      code: error.code || null
+    };
   } finally {
     startingStreams.delete(streamId);
   }
@@ -996,14 +1327,15 @@ function updateStreamActivity(streamId) {
   }
 }
 
-async function stopStream(streamId) {
+async function stopStream(streamId, options = {}) {
   try {
+    const stopOptions = buildStopOptions(options.reason || 'user_stop', options.message || null);
     const streamData = activeStreams.get(streamId);
     const stream = await Stream.findById(streamId);
 
     if (!streamData) {
       if (stream && stream.status === 'live') {
-        await Stream.updateStatus(streamId, 'offline', stream.user_id);
+        await transitionStreamToDone(streamId, stream.user_id, buildStopOptions(options.reason || 'app_process_missing', options.message || null));
         if (schedulerService) {
           schedulerService.handleStreamStopped(streamId);
         }
@@ -1029,8 +1361,8 @@ async function stopStream(streamId) {
         } catch (e) { }
       }
 
-      await saveStreamHistory(stream);
-      await Stream.updateStatus(streamId, 'offline', stream.user_id);
+      await saveStreamHistory(stream, stopOptions);
+      await Stream.updateStatus(streamId, 'done', stream.user_id, stopOptions);
     }
 
     if (schedulerService) {
@@ -1049,7 +1381,9 @@ function cleanupTempFiles(streamId) {
   const tempDir = path.join(__dirname, '..', 'temp');
   const files = [
     path.join(tempDir, `playlist_${streamId}.txt`),
-    path.join(tempDir, `playlist_audio_${streamId}.txt`)
+    path.join(tempDir, `playlist_audio_${streamId}.txt`),
+    path.join(tempDir, `playlist_audio_${streamId}_t1.txt`),
+    path.join(tempDir, `playlist_audio_${streamId}_t2.txt`)
   ];
 
   for (const file of files) {
@@ -1079,6 +1413,16 @@ function isStreamStarting(streamId) {
 
 function getActiveStreams() {
   return Array.from(activeStreams.keys());
+}
+
+function getActiveStreamPids() {
+  const pids = {};
+  activeStreams.forEach((data, id) => {
+    if (data.pid) {
+      pids[id] = data.pid;
+    }
+  });
+  return pids;
 }
 
 function getActiveStreamInfo(streamId) {
@@ -1113,13 +1457,16 @@ async function syncStreamStatuses() {
         if (stream.end_time) {
           const endTime = new Date(stream.end_time);
           if (endTime.getTime() <= Date.now()) {
-            await Stream.updateStatus(stream.id, 'offline', stream.user_id);
+            await Stream.updateStatus(stream.id, 'offline', stream.user_id, buildStopOptions('scheduled_end'));
             cleanupStreamData(stream.id);
             continue;
           }
         }
 
-        await Stream.updateStatus(stream.id, 'offline', stream.user_id, { preserveEndTime: true });
+        await Stream.updateStatus(stream.id, 'offline', stream.user_id, {
+          preserveEndTime: true,
+          ...buildStopOptions('app_process_missing')
+        });
         cleanupStreamData(stream.id);
       }
     }
@@ -1145,17 +1492,22 @@ async function syncStreamStatuses() {
 
       if (streamData.process && streamData.process.exitCode !== null) {
         activeStreams.delete(streamId);
-        await Stream.updateStatus(streamId, 'offline', stream.user_id);
+        await Stream.updateStatus(streamId, 'offline', stream.user_id, buildStopOptions('ffmpeg_exit'));
         cleanupStreamData(streamId);
       }
     }
   } catch (error) { }
 }
 
+const poorSignalNotified = new Map();
+
 async function healthCheckStreams() {
+  return; // Disabled to prevent YouTube API quota exhaustion
   try {
     const now = Date.now();
     const staleThreshold = 5 * 60 * 1000;
+    const notificationService = require('./notificationService');
+    const youtubeService = require('./youtubeService');
 
     for (const [streamId, streamData] of activeStreams) {
       if (streamData.process && streamData.process.exitCode !== null) {
@@ -1165,21 +1517,96 @@ async function healthCheckStreams() {
           if (stream.end_time) {
             const endTime = new Date(stream.end_time);
             if (endTime.getTime() <= Date.now()) {
-              await Stream.updateStatus(streamId, 'offline', stream.user_id);
+              await Stream.updateStatus(streamId, 'offline', stream.user_id, buildStopOptions('scheduled_end'));
               cleanupStreamData(streamId);
               continue;
             }
           }
-          await Stream.updateStatus(streamId, 'offline', stream.user_id, { preserveEndTime: true });
+          await Stream.updateStatus(streamId, 'offline', stream.user_id, {
+            preserveEndTime: true,
+            ...buildStopOptions('ffmpeg_exit')
+          });
         }
         cleanupStreamData(streamId);
         continue;
       }
 
+      const stream = await Stream.findById(streamId);
+      if (stream && stream.is_youtube_api) {
+        const lastYoutubeCheck = streamData.lastYoutubeCheck || 0;
+        if (now - lastYoutubeCheck >= YOUTUBE_CHECK_INTERVAL) {
+          streamData.lastYoutubeCheck = now;
+
+          if (stream.youtube_broadcast_id) {
+            try {
+              const lifecycleStatus = await youtubeService.getBroadcastLifecycleStatus(
+                stream.user_id,
+                stream.youtube_channel_id,
+                stream.youtube_broadcast_id
+              );
+
+              if (lifecycleStatus && ['complete', 'revoked'].includes(lifecycleStatus.toLowerCase())) {
+                addStreamLog(streamId, `YouTube broadcast lifecycle is ${lifecycleStatus}; stopping local FFmpeg.`);
+                manuallyStoppingStreams.add(streamId);
+                await killFFmpegProcess(streamId, streamData);
+                activeStreams.delete(streamId);
+                manuallyStoppingStreams.delete(streamId);
+                await Stream.updateStatus(
+                  streamId,
+                  'done',
+                  stream.user_id,
+                  buildStopOptions('youtube_ended', `YouTube broadcast status: ${lifecycleStatus}.`)
+                );
+                cleanupStreamData(streamId);
+                continue;
+              }
+            } catch (youtubeStatusError) {
+              console.error(`[StreamingService] Failed YouTube lifecycle check for stream ${streamId}:`, youtubeStatusError.message);
+            }
+          }
+
+          if (stream.youtube_stream_id) {
+            try {
+              const User = require('../models/User');
+              const user = await User.findById(stream.user_id);
+              const hasTelegram = user && user.telegram_bot_token && user.telegram_chat_id;
+
+              if (hasTelegram) {
+                const health = await youtubeService.getStreamHealth(
+                  stream.user_id,
+                  stream.youtube_channel_id,
+                  stream.youtube_stream_id
+                );
+
+                if (health && health.status) {
+                  const status = health.status.toLowerCase();
+                  if (status === 'poor' || status === 'bad') {
+                    const lastNotified = poorSignalNotified.get(streamId);
+                    // Notify only once every 30 minutes to avoid spam
+                    if (!lastNotified || (now - lastNotified) > (30 * 60 * 1000)) {
+                      await notificationService.sendPoorSignalNotification(
+                        stream.user_id,
+                        stream.title,
+                        status,
+                        health.configurationIssues || []
+                      );
+                      poorSignalNotified.set(streamId, now);
+                    }
+                  } else if (status === 'good' || status === 'excellent') {
+                    poorSignalNotified.delete(streamId);
+                  }
+                }
+              }
+            } catch (healthError) {
+              console.error(`[StreamingService] Failed health check for stream ${streamId}:`, healthError.message);
+            }
+          }
+        }
+      }
+
       if (streamData.lastActivity && (now - streamData.lastActivity) > staleThreshold) {
         addStreamLog(streamId, 'Stream appears stale, restarting...');
 
-        const stream = await Stream.findById(streamId);
         if (stream && stream.status === 'live') {
           if (stream.end_time) {
             const endTime = new Date(stream.end_time);
@@ -1188,7 +1615,7 @@ async function healthCheckStreams() {
               await killFFmpegProcess(streamId, streamData);
               activeStreams.delete(streamId);
               manuallyStoppingStreams.delete(streamId);
-              await Stream.updateStatus(streamId, 'offline', stream.user_id);
+              await Stream.updateStatus(streamId, 'offline', stream.user_id, buildStopOptions('scheduled_end'));
               cleanupStreamData(streamId);
               continue;
             }
@@ -1210,10 +1637,42 @@ async function healthCheckStreams() {
         }
       }
     }
+    
+    // Auto-cleanup done streams (1 hour after completion)
+    await cleanupDoneStreams();
   } catch (error) { }
 }
 
-async function saveStreamHistory(stream) {
+async function cleanupDoneStreams() {
+  try {
+    const now = new Date();
+    const oneHourAgo = new Date(now.getTime() - (60 * 60 * 1000)).toISOString();
+    
+    return new Promise((resolve) => {
+      db.all(
+        "SELECT id, user_id FROM streams WHERE status = 'done' AND auto_delete = 1 AND done_at < ?",
+        [oneHourAgo],
+        async (err, rows) => {
+          if (err) {
+            console.error('[StreamingService] Cleanup fetch error:', err.message);
+            return resolve();
+          }
+          
+          if (rows && rows.length > 0) {
+            for (const row of rows) {
+              try {
+                await Stream.delete(row.id, row.user_id);
+              } catch (e) { }
+            }
+          }
+          resolve();
+        }
+      );
+    });
+  } catch (error) { }
+}
+
+async function saveStreamHistory(stream, stopOptions = {}) {
   try {
     if (!stream.start_time) {
       return false;
@@ -1228,6 +1687,9 @@ async function saveStreamHistory(stream) {
     }
 
     const videoDetails = stream.video_id ? await Video.findById(stream.video_id) : null;
+
+    const stopReason = stopOptions.stopReason || 'unknown';
+    const status = (stopReason === 'scheduled_end' || stopReason === 'user_stop') ? 'done' : 'error';
 
     const historyData = {
       id: uuidv4(),
@@ -1244,21 +1706,26 @@ async function saveStreamHistory(stream) {
       end_time: endTime.toISOString(),
       duration: durationSeconds,
       use_advanced_settings: stream.use_advanced_settings ? 1 : 0,
-      user_id: stream.user_id
+      user_id: stream.user_id,
+      status: status,
+      last_stop_reason: stopReason,
+      last_stop_message: stopOptions.stopMessage || null
     };
 
     return new Promise((resolve, reject) => {
       db.run(
         `INSERT INTO stream_history (
           id, stream_id, title, platform, platform_icon, video_id, video_title,
-          resolution, bitrate, fps, start_time, end_time, duration, use_advanced_settings, user_id
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          resolution, bitrate, fps, start_time, end_time, duration, use_advanced_settings, user_id,
+          status, last_stop_reason, last_stop_message
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           historyData.id, historyData.stream_id, historyData.title,
           historyData.platform, historyData.platform_icon, historyData.video_id, historyData.video_title,
           historyData.resolution, historyData.bitrate, historyData.fps,
           historyData.start_time, historyData.end_time, historyData.duration,
-          historyData.use_advanced_settings, historyData.user_id
+          historyData.use_advanced_settings, historyData.user_id,
+          historyData.status, historyData.last_stop_reason, historyData.last_stop_message
         ],
         function (err) {
           if (err) {
@@ -1270,6 +1737,18 @@ async function saveStreamHistory(stream) {
     });
   } catch (error) {
     return false;
+  }
+}
+
+async function transitionStreamToDone(streamId, userId, stopOptions) {
+  try {
+    const stream = await Stream.findById(streamId);
+    if (stream) {
+      await saveStreamHistory(stream, stopOptions);
+      await Stream.updateStatus(streamId, 'done', userId, stopOptions);
+    }
+  } catch (error) {
+    console.error(`[StreamingService] Error transitioning stream ${streamId} to done:`, error);
   }
 }
 
@@ -1291,11 +1770,6 @@ async function gracefulShutdown() {
 
       manuallyStoppingStreams.add(streamId);
       await killFFmpegProcess(streamId, streamData);
-
-      const stream = await Stream.findById(streamId);
-      if (stream) {
-        await Stream.updateStatus(streamId, 'offline', stream.user_id);
-      }
 
       activeStreams.delete(streamId);
       cleanupStreamData(streamId);
@@ -1320,6 +1794,7 @@ module.exports = {
   isStreamActive,
   isStreamStarting,
   getActiveStreams,
+  getActiveStreamPids,
   getActiveStreamInfo,
   getStreamLogs,
   syncStreamStatuses,

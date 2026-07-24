@@ -30,12 +30,17 @@ class Stream {
       youtube_thumbnail = null,
       youtube_channel_id = null,
       is_youtube_api = false,
-      youtube_monetization = false
+      youtube_monetization = false,
+      youtube_playlist_id = null,
+      made_for_kids = false,
+      auto_delete = true
     } = streamData;
     const loop_video_int = loop_video ? 1 : 0;
     const use_advanced_settings_int = use_advanced_settings ? 1 : 0;
     const is_youtube_api_int = is_youtube_api ? 1 : 0;
     const youtube_monetization_int = youtube_monetization ? 1 : 0;
+    const made_for_kids_int = made_for_kids ? 1 : 0;
+    const auto_delete_int = auto_delete ? 1 : 0;
     const final_status = status || (schedule_time ? 'scheduled' : 'offline');
     const status_updated_at = new Date().toISOString();
     return new Promise((resolve, reject) => {
@@ -44,13 +49,15 @@ class Stream {
           id, title, video_id, rtmp_url, stream_key, platform, platform_icon,
           bitrate, resolution, fps, orientation, loop_video,
           schedule_time, end_time, duration, status, status_updated_at, use_advanced_settings, user_id,
-          youtube_broadcast_id, youtube_stream_id, youtube_description, youtube_privacy, youtube_category, youtube_tags, youtube_thumbnail, youtube_channel_id, is_youtube_api, youtube_monetization
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          youtube_broadcast_id, youtube_stream_id, youtube_description, youtube_privacy, youtube_category, youtube_tags, youtube_thumbnail, youtube_channel_id, is_youtube_api, youtube_monetization, youtube_playlist_id, made_for_kids,
+          auto_delete
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           id, title, video_id, rtmp_url, stream_key, platform, platform_icon,
           bitrate, resolution, fps, orientation, loop_video_int,
           schedule_time, end_time, duration, final_status, status_updated_at, use_advanced_settings_int, user_id,
-          youtube_broadcast_id, youtube_stream_id, youtube_description, youtube_privacy, youtube_category, youtube_tags, youtube_thumbnail, youtube_channel_id, is_youtube_api_int, youtube_monetization_int
+          youtube_broadcast_id, youtube_stream_id, youtube_description, youtube_privacy, youtube_category, youtube_tags, youtube_thumbnail, youtube_channel_id, is_youtube_api_int, youtube_monetization_int, youtube_playlist_id, made_for_kids_int,
+          auto_delete_int
         ],
         function (err) {
           if (err) {
@@ -74,6 +81,8 @@ class Stream {
           row.use_advanced_settings = row.use_advanced_settings === 1;
           row.is_youtube_api = row.is_youtube_api === 1;
           row.youtube_monetization = row.youtube_monetization === 1;
+          row.made_for_kids = row.made_for_kids === 1;
+          row.auto_delete = row.auto_delete === 1;
         }
         resolve(row);
       });
@@ -98,11 +107,13 @@ class Stream {
                END AS video_type,
                yc.channel_name AS youtube_channel_name,
                yc.channel_thumbnail AS youtube_channel_thumbnail,
-               yc.channel_id AS youtube_channel_external_id
+               yc.channel_id AS youtube_channel_external_id,
+               als.name AS autolive_series_name
         FROM streams s
         LEFT JOIN videos v ON s.video_id = v.id
         LEFT JOIN playlists p ON s.video_id = p.id
         LEFT JOIN youtube_channels yc ON s.youtube_channel_id = yc.id
+        LEFT JOIN autolive_series als ON s.id LIKE 'autolive_' || als.id || '%'
       `;
       const params = [];
       const conditions = [];
@@ -145,6 +156,8 @@ class Stream {
             row.use_advanced_settings = row.use_advanced_settings === 1;
             row.is_youtube_api = row.is_youtube_api === 1;
             row.youtube_monetization = row.youtube_monetization === 1;
+            row.made_for_kids = row.made_for_kids === 1;
+            row.auto_delete = row.auto_delete === 1;
           });
         }
         resolve(rows || []);
@@ -152,7 +165,7 @@ class Stream {
     });
   }
   static findAllPaginated(userId = null, options = {}) {
-    const { page = 1, limit = 10, filter = null, search = '' } = options;
+    const { page = 1, limit = 10, filter = null, search = '', sort = 'default' } = options;
     const offset = (page - 1) * limit;
     return new Promise((resolve, reject) => {
       let baseQuery = `
@@ -160,6 +173,7 @@ class Stream {
         LEFT JOIN videos v ON s.video_id = v.id
         LEFT JOIN playlists p ON s.video_id = p.id
         LEFT JOIN youtube_channels yc ON s.youtube_channel_id = yc.id
+        LEFT JOIN autolive_series als ON s.id LIKE 'autolive_' || als.id || '%'
       `;
       const params = [];
       const conditions = [];
@@ -173,7 +187,7 @@ class Stream {
         } else if (filter === 'scheduled') {
           conditions.push("s.status = 'scheduled'");
         } else if (filter === 'offline') {
-          conditions.push("s.status = 'offline'");
+          conditions.push("(s.status = 'offline' OR s.status = 'done')");
         }
       }
       if (search) {
@@ -208,15 +222,31 @@ class Stream {
                  END AS video_type,
                  yc.channel_name AS youtube_channel_name,
                  yc.channel_thumbnail AS youtube_channel_thumbnail,
-                 yc.channel_id AS youtube_channel_external_id
+                 yc.channel_id AS youtube_channel_external_id,
+                 als.name AS autolive_series_name
           ${baseQuery}
           ORDER BY 
-            CASE s.status 
-              WHEN 'live' THEN 1 
-              WHEN 'scheduled' THEN 2 
-              WHEN 'offline' THEN 3 
-              ELSE 4 
-            END,
+            ${sort === 'channel' ? `
+              CASE WHEN yc.channel_name IS NOT NULL THEN 1 ELSE 2 END ASC,
+              yc.channel_name ASC,
+            ` : ''}
+            ${sort === 'status' ? `
+              CASE s.status 
+                WHEN 'live' THEN 1 
+                WHEN 'scheduled' THEN 2 
+                WHEN 'offline' THEN 3 
+                WHEN 'done' THEN 4
+                ELSE 5 
+              END ASC,
+            ` : `
+               CASE s.status 
+                 WHEN 'live' THEN 1 
+                 WHEN 'scheduled' THEN 2 
+                 WHEN 'offline' THEN 3 
+                 WHEN 'done' THEN 4 
+                 ELSE 5 
+               END ASC,
+            `}
             s.created_at DESC
           LIMIT ? OFFSET ?
         `;
@@ -231,6 +261,8 @@ class Stream {
               row.use_advanced_settings = row.use_advanced_settings === 1;
               row.is_youtube_api = row.is_youtube_api === 1;
               row.youtube_monetization = row.youtube_monetization === 1;
+              row.made_for_kids = row.made_for_kids === 1;
+              row.auto_delete = row.auto_delete === 1;
             });
           }
           resolve({
@@ -254,6 +286,12 @@ class Stream {
         fields.push(`${key} = ?`);
         values.push(value ? 1 : 0);
       } else if (key === 'youtube_monetization' && typeof value === 'boolean') {
+        fields.push(`${key} = ?`);
+        values.push(value ? 1 : 0);
+      } else if (key === 'made_for_kids' && typeof value === 'boolean') {
+        fields.push(`${key} = ?`);
+        values.push(value ? 1 : 0);
+      } else if (key === 'auto_delete' && typeof value === 'boolean') {
         fields.push(`${key} = ?`);
         values.push(value ? 1 : 0);
       } else {
@@ -291,7 +329,23 @@ class Stream {
   }
   static updateStatus(id, status, userId = null, options = {}) {
     const status_updated_at = new Date().toISOString();
-    const { startTimeOverride = null, preserveEndTime = false } = options;
+    const {
+      startTimeOverride = null,
+      preserveEndTime = false,
+      stopReason = null,
+      stopMessage = null
+    } = options;
+
+    const appendStopReasonFields = (fields, params) => {
+      if (stopReason !== null || stopMessage !== null) {
+        fields.push('last_stop_reason = ?');
+        params.push(stopReason);
+        fields.push('last_stop_message = ?');
+        params.push(stopMessage);
+        fields.push('last_stop_at = ?');
+        params.push(status_updated_at);
+      }
+    };
     
     return new Promise((resolve, reject) => {
       let query;
@@ -303,29 +357,51 @@ class Stream {
             status = ?, 
             status_updated_at = ?, 
             start_time = ?,
+            last_stop_reason = NULL,
+            last_stop_message = NULL,
+            last_stop_at = NULL,
             updated_at = CURRENT_TIMESTAMP
            WHERE id = ?`;
         params = [status, status_updated_at, start_time, id];
       } else if (status === 'offline') {
         if (preserveEndTime) {
-          query = `UPDATE streams SET 
-              status = ?, 
-              status_updated_at = ?,
-              schedule_time = NULL,
-              updated_at = CURRENT_TIMESTAMP
-             WHERE id = ?`;
-          params = [status, status_updated_at, id];
+          const fields = [
+            'status = ?',
+            'status_updated_at = ?',
+            'schedule_time = NULL'
+          ];
+          params = [status, status_updated_at];
+          appendStopReasonFields(fields, params);
+          fields.push('updated_at = CURRENT_TIMESTAMP');
+          query = `UPDATE streams SET ${fields.join(', ')} WHERE id = ?`;
+          params.push(id);
         } else {
-          query = `UPDATE streams SET 
-              status = ?, 
-              status_updated_at = ?,
-              schedule_time = NULL,
-              end_time = NULL,
-              start_time = NULL,
-              updated_at = CURRENT_TIMESTAMP
-             WHERE id = ?`;
-          params = [status, status_updated_at, id];
+          const fields = [
+            'status = ?',
+            'status_updated_at = ?',
+            'schedule_time = NULL',
+            'end_time = NULL',
+            'start_time = NULL'
+          ];
+          params = [status, status_updated_at];
+          appendStopReasonFields(fields, params);
+          fields.push('updated_at = CURRENT_TIMESTAMP');
+          query = `UPDATE streams SET ${fields.join(', ')} WHERE id = ?`;
+          params.push(id);
         }
+      } else if (status === 'done') {
+        const done_at = new Date().toISOString();
+        const fields = [
+          'status = ?',
+          'status_updated_at = ?',
+          'done_at = ?',
+          'schedule_time = NULL'
+        ];
+        params = [status, status_updated_at, done_at];
+        appendStopReasonFields(fields, params);
+        fields.push('updated_at = CURRENT_TIMESTAMP');
+        query = `UPDATE streams SET ${fields.join(', ')} WHERE id = ?`;
+        params.push(id);
       } else {
         query = `UPDATE streams SET 
             status = ?, 
@@ -426,6 +502,8 @@ class Stream {
             row.use_advanced_settings = row.use_advanced_settings === 1;
             row.is_youtube_api = row.is_youtube_api === 1;
             row.youtube_monetization = row.youtube_monetization === 1;
+            row.made_for_kids = row.made_for_kids === 1;
+            row.auto_delete = row.auto_delete === 1;
           }
           resolve(row);
         }
@@ -461,6 +539,7 @@ class Stream {
             row.use_advanced_settings = row.use_advanced_settings === 1;
             row.is_youtube_api = row.is_youtube_api === 1;
             row.youtube_monetization = row.youtube_monetization === 1;
+            row.made_for_kids = row.made_for_kids === 1;
           });
         }
         resolve(rows || []);
@@ -483,6 +562,30 @@ class Stream {
           return reject(err);
         }
         resolve(row.count > 0);
+      });
+    });
+  }
+  static getHistoricalInputs(userId) {
+    return new Promise((resolve, reject) => {
+      const query = `
+        SELECT DISTINCT title, rtmp_url, stream_key, youtube_description, youtube_tags
+        FROM streams
+        WHERE user_id = ?
+        ORDER BY created_at DESC
+        LIMIT 50
+      `;
+      db.all(query, [userId], (err, rows) => {
+        if (err) {
+          console.error('Error fetching historical inputs:', err.message);
+          return reject(err);
+        }
+        const titles = [...new Set(rows.map(r => r.title).filter(Boolean))];
+        const rtmpUrls = [...new Set(rows.map(r => r.rtmp_url).filter(Boolean))];
+        const streamKeys = [...new Set(rows.map(r => r.stream_key).filter(Boolean))];
+        const descriptions = [...new Set(rows.map(r => r.youtube_description).filter(Boolean))];
+        const tags = [...new Set(rows.map(r => r.youtube_tags).filter(Boolean))];
+        
+        resolve({ titles, rtmpUrls, streamKeys, descriptions, tags });
       });
     });
   }

@@ -251,6 +251,36 @@ function createTables() {
         }
       });
 
+      db.run(`ALTER TABLE streams ADD COLUMN done_at TIMESTAMP`, (err) => {
+        if (err && !err.message.includes('duplicate column name')) {
+          console.error('Error adding done_at column to streams:', err.message);
+        }
+      });
+
+      db.run(`ALTER TABLE streams ADD COLUMN last_stop_reason TEXT`, (err) => {
+        if (err && !err.message.includes('duplicate column name')) {
+          console.error('Error adding last_stop_reason column to streams:', err.message);
+        }
+      });
+
+      db.run(`ALTER TABLE streams ADD COLUMN last_stop_message TEXT`, (err) => {
+        if (err && !err.message.includes('duplicate column name')) {
+          console.error('Error adding last_stop_message column to streams:', err.message);
+        }
+      });
+
+      db.run(`ALTER TABLE streams ADD COLUMN last_stop_at TIMESTAMP`, (err) => {
+        if (err && !err.message.includes('duplicate column name')) {
+          console.error('Error adding last_stop_at column to streams:', err.message);
+        }
+      });
+
+      db.run(`ALTER TABLE streams ADD COLUMN auto_delete INTEGER DEFAULT 1`, (err) => {
+        if (err && !err.message.includes('duplicate column name')) {
+          console.error('Error adding auto_delete column to streams:', err.message);
+        }
+      });
+
       db.run(`CREATE TABLE IF NOT EXISTS stream_rotations (
         id TEXT PRIMARY KEY,
         user_id TEXT NOT NULL,
