@@ -4838,6 +4838,481 @@ app.get('/api/autolive', isAuthenticated, async (req, res) => {
   }
 });
 
+app.get('/api/autolive/:id', isAuthenticated, async (req, res) => {
+  try {
+    const Autolive = require('./models/Autolive');
+    const series = await Autolive.findByIdWithItems(req.params.id);
+    if (!series) return res.status(404).json({ success: false, error: 'Series not found' });
+    res.json({ success: true, series });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+app.get('/api/autolive/:id/download-schedule', isAuthenticated, async (req, res) => {
+  try {
+    const Autolive = require('./models/Autolive');
+    const AutoliveService = require('./services/autoliveService');
+    const { db } = require('./db/database');
+    const series = await Autolive.findByIdWithItems(req.params.id);
+    if (!series || series.user_id !== req.session.userId) {
+      return res.status(404).send('Autolive series not found or unauthorized');
+    }
+    
+    const items = series.items || [];
+    if (items.length === 0) {
+      return res.status(400).send('No items found in this autolive series.');
+    }
+
+    const tz = series.timezone || process.env.APP_TIMEZONE || process.env.TZ || 'Asia/Bangkok';
+
+    // Fetch actual stream history from the database
+    // Fetch all playlists and videos to resolve source names
+    const playlists = await new Promise((resolve) => {
+      db.all("SELECT id, name FROM playlists", [], (err, rows) => {
+        resolve(rows || []);
+      });
+    });
+    const playlistMap = new Map(playlists.map(p => [p.id, p.name]));
+
+    const videos = await new Promise((resolve) => {
+      db.all("SELECT id, title FROM videos", [], (err, rows) => {
+        resolve(rows || []);
+      });
+    });
+    const videoMap = new Map(videos.map(v => [v.id, v.title]));
+
+    // Fetch actual stream history from the database
+    const dbStreams = await new Promise((resolve, reject) => {
+      db.all(
+        'SELECT * FROM streams WHERE id LIKE ? ORDER BY COALESCE(schedule_time, start_time) ASC',
+        [`autolive_${series.id}_%`],
+        (err, rows) => {
+          if (err) reject(err);
+          else resolve(rows || []);
+        }
+      );
+    });
+
+    const dbStartTimes = new Set();
+    const scheduleItems = [];
+
+    // Parse and add history streams from DB
+    dbStreams.forEach(stream => {
+      let startTime = null;
+      if (stream.schedule_time) {
+        startTime = new Date(stream.schedule_time);
+      } else if (stream.start_time) {
+        startTime = new Date(stream.start_time);
+      }
+      
+      if (!startTime || isNaN(startTime.getTime())) return;
+      dbStartTimes.add(startTime.getTime());
+
+      let statusStr = 'Belum Mulai';
+      if (stream.status === 'live') {
+        statusStr = 'Sedang Berlangsung';
+      } else if (['done', 'offline', 'complete'].includes(stream.status)) {
+        statusStr = 'Sudah Selesai';
+      } else if (stream.status === 'error' || stream.status === 'failed') {
+        statusStr = 'Gagal';
+      }
+
+      let sourceName = 'Default';
+      if (stream.video_id) {
+        if (playlistMap.has(stream.video_id)) {
+          sourceName = `Playlist: ${playlistMap.get(stream.video_id)}`;
+        } else if (videoMap.has(stream.video_id)) {
+          sourceName = `Video: ${videoMap.get(stream.video_id)}`;
+        }
+      }
+
+      scheduleItems.push({
+        startTime,
+        title: stream.title,
+        status: statusStr,
+        sourceName
+      });
+    });
+
+    // Generate upcoming schedules
+    const totalSessions = AutoliveService.getTotalSessions(items);
+    const upcomingCount = Math.max(100, totalSessions);
+    const generatedUpcoming = AutoliveService.getUpcomingSchedule(series, items, upcomingCount);
+
+    generatedUpcoming.forEach(sched => {
+      const timeMs = sched.startTime.getTime();
+      if (!dbStartTimes.has(timeMs)) {
+        // Resolve item source name
+        const { item } = AutoliveService.getItemForGlobalIndex(series, items, sched.globalIndex);
+        const itemId = item.internal_playlist_id || item.video_id || series.internal_playlist_id || series.video_id;
+        
+        let sourceName = 'Default';
+        if (itemId) {
+          if (playlistMap.has(itemId)) {
+            sourceName = `Playlist: ${playlistMap.get(itemId)}`;
+          } else if (videoMap.has(itemId)) {
+            sourceName = `Video: ${videoMap.get(itemId)}`;
+          }
+        }
+
+        scheduleItems.push({
+          startTime: sched.startTime,
+          title: sched.title,
+          status: 'Belum Mulai',
+          sourceName
+        });
+      }
+    });
+
+    // Sort all chronologically by start time
+    scheduleItems.sort((a, b) => a.startTime - b.startTime);
+    
+    let content = `JADWAL & RIWAYAT TAYANG AUTOLIVE: ${series.name}\r\n`;
+    content += `Status Seri: ${series.is_active ? 'AKTIF' : 'NON-AKTIF'}\r\n`;
+    content += `Jadwal Ulang: ${series.repeat_mode}\r\n`;
+    content += `Timezone: ${tz}\r\n`;
+    content += `Total Jadwal: ${scheduleItems.length} video (termasuk riwayat)\r\n`;
+    content += `Tanggal Diunduh: ${new Date().toLocaleString('en-US', { timeZone: tz })}\r\n`;
+    content += `\r\n`;
+    content += `========================================================================================================================================================================\r\n`;
+    content += `NO.  | TANGGAL & WAKTU TAYANG         | STATUS             | SUMBER (PLAYLIST/VIDEO)                      | JUDUL VIDEO\r\n`;
+    content += `========================================================================================================================================================================\r\n`;
+    
+    scheduleItems.forEach((item, index) => {
+      const formattedDate = item.startTime.toLocaleString('en-US', {
+        timeZone: tz,
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false
+      });
+      const noStr = String(index + 1).padEnd(4, ' ');
+      const dateStr = formattedDate.padEnd(30, ' ');
+      const statusStr = item.status.padEnd(18, ' ');
+      const sourceStr = (item.sourceName || 'Default').padEnd(44, ' ');
+      content += `${noStr} | ${dateStr} | ${statusStr} | ${sourceStr} | ${item.title}\r\n`;
+    });
+    
+    content += `========================================================================================================================================================================\r\n`;
+    
+    const safeFileName = series.name.replace(/[^a-z0-9]/gi, '_').toLowerCase();
+    res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="jadwal_autolive_${safeFileName}.txt"`);
+    res.send(content);
+  } catch (error) {
+    console.error('Error downloading autolive schedule:', error);
+    res.status(500).send('Internal Server Error: ' + error.message);
+  }
+});
+
+app.post('/api/autolive/upload-thumbnails', isAuthenticated, uploadThumbnail.any(), async (req, res) => {
+  try {
+    const uploadedFiles = req.files || [];
+    const thumbnails = [];
+    
+    for (const file of uploadedFiles) {
+      const thumbFilename = `thumb-${path.parse(file.filename).name}.jpg`;
+      try {
+        await generateImageThumbnail(file.path, thumbFilename);
+        
+        // Clean up the original uploaded file to save space if it's different from the thumbnail
+        if (file.filename !== thumbFilename) {
+          try {
+            fs.unlinkSync(file.path);
+          } catch (unlinkErr) {
+            console.warn('[Autolive] Failed to delete original uploaded file:', unlinkErr.message);
+          }
+        }
+        
+        thumbnails.push({
+          originalName: file.originalname,
+          filename: thumbFilename,
+          path: `/uploads/thumbnails/${thumbFilename}`
+        });
+      } catch (thumbErr) {
+        console.error('[Autolive] Error generating thumbnail on upload:', thumbErr);
+        // Fallback to original uploaded file if ffmpeg fails
+        thumbnails.push({
+          originalName: file.originalname,
+          filename: file.filename,
+          path: `/uploads/thumbnails/${file.filename}`
+        });
+      }
+    }
+    
+    res.json({ success: true, thumbnails });
+  } catch (error) {
+    console.error('Error uploading thumbnails:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+app.post('/api/autolive', isAuthenticated, uploadThumbnail.any(), async (req, res) => {
+  try {
+    const Autolive = require('./models/Autolive');
+    const { 
+      name, video_id, internal_playlist_id, start_time, repeat_mode, duration, items, timezone,
+      youtube_channel_id, custom_dates, privacy, category_id, monetization_enabled, 
+      made_for_kids, playlist_id, is_random_video, daily_times
+    } = req.body;
+    
+    const parsedItems = typeof items === 'string' ? JSON.parse(items) : items;
+    
+    const series = await Autolive.create({
+      user_id: req.session.userId,
+      name,
+      video_id: video_id || '',
+      internal_playlist_id: internal_playlist_id || null,
+      start_time,
+      repeat_mode,
+      timezone: timezone || 'Asia/Bangkok',
+      duration: parseInt(duration),
+      youtube_channel_id,
+      custom_dates,
+      privacy: privacy || 'public',
+      category_id: category_id || '10',
+      monetization_enabled: parseInt(monetization_enabled) || 0,
+      made_for_kids: parseInt(made_for_kids) || 0,
+      playlist_id: playlist_id || null,
+      is_random_video: parseInt(is_random_video) || 0,
+      random_pool_state: null,
+      daily_times: daily_times || null
+    });
+    
+    const uploadedFiles = req.files || [];
+    const uploadedFileMap = new Map(uploadedFiles.map(file => [file.fieldname, file]));
+    
+    for (let i = 0; i < parsedItems.length; i++) {
+      const item = parsedItems[i];
+      const finalThumbnails = [...(item.existing_thumbnails || [])];
+      const finalOriginals = [...(item.existing_original_thumbnails || [])];
+      
+      const newCount = parseInt(item.new_thumbnails_count) || 0;
+      for (let j = 0; j < newCount; j++) {
+        const fileKey = `slot_${i}_thumbnail_${j}`;
+        const file = uploadedFileMap.get(fileKey);
+        if (file) {
+          const thumbFilename = `thumb-${path.parse(file.filename).name}.jpg`;
+          try {
+            await generateImageThumbnail(file.path, thumbFilename);
+            if (file.filename !== thumbFilename) {
+              try {
+                fs.unlinkSync(file.path);
+              } catch (unlinkErr) {
+                console.warn('[Autolive] Failed to delete original uploaded file:', unlinkErr.message);
+              }
+            }
+            finalOriginals.push(thumbFilename);
+            finalThumbnails.push(`/uploads/thumbnails/${thumbFilename}`);
+          } catch (thumbErr) {
+            console.error('[Autolive] Error generating thumbnail on save:', thumbErr);
+            finalOriginals.push(file.filename);
+            finalThumbnails.push(`/uploads/thumbnails/${file.filename}`);
+          }
+        }
+      }
+      
+      await Autolive.addItem({
+        series_id: series.id,
+        video_id: item.video_id || null,
+        internal_playlist_id: item.internal_playlist_id || null,
+        titles: item.titles || [],
+        description: item.description || '',
+        tags: item.tags || '',
+        thumbnails: finalThumbnails,
+        original_thumbnails: finalOriginals,
+        current_index: 0,
+        order_index: i
+      });
+    }
+    
+    require('./services/autoliveService').checkAutoliveSeries().catch(err => {
+      console.error('Error triggering autolive check after create:', err);
+    });
+
+    res.json({ success: true, series });
+  } catch (error) {
+    console.error('Error creating autolive:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+app.put('/api/autolive/:id', isAuthenticated, uploadThumbnail.any(), async (req, res) => {
+  try {
+    const Autolive = require('./models/Autolive');
+    const { 
+      name, video_id, internal_playlist_id, start_time, repeat_mode, duration, items, timezone,
+      youtube_channel_id, custom_dates, privacy, category_id, monetization_enabled, 
+      made_for_kids, playlist_id, is_random_video, daily_times
+    } = req.body;
+    
+    // Check if we need to reset the random pool (e.g. playlist changed or randomization status changed)
+    const existingSeries = await Autolive.findById(req.params.id);
+    let randomPoolState = existingSeries ? existingSeries.random_pool_state : null;
+    if (existingSeries && (existingSeries.internal_playlist_id !== internal_playlist_id || existingSeries.is_random_video !== parseInt(is_random_video))) {
+      randomPoolState = null;
+    }
+
+    await Autolive.update(req.params.id, {
+      name,
+      video_id: video_id || '',
+      internal_playlist_id: internal_playlist_id || null,
+      start_time,
+      repeat_mode,
+      timezone: timezone || 'Asia/Bangkok',
+      duration: parseInt(duration),
+      youtube_channel_id,
+      custom_dates,
+      privacy: privacy || 'public',
+      category_id: category_id || '10',
+      monetization_enabled: parseInt(monetization_enabled) || 0,
+      made_for_kids: parseInt(made_for_kids) || 0,
+      playlist_id: playlist_id || null,
+      is_random_video: parseInt(is_random_video) || 0,
+      random_pool_state: randomPoolState,
+      daily_times: daily_times || null
+    });
+    
+    if (items) {
+      const parsedItems = typeof items === 'string' ? JSON.parse(items) : items;
+      const existingItems = await Autolive.getItemsBySeriesId(req.params.id);
+      await Autolive.deleteItemsBySeriesId(req.params.id);
+      
+      const uploadedFiles = req.files || [];
+      const uploadedFileMap = new Map(uploadedFiles.map(file => [file.fieldname, file]));
+      
+      for (let i = 0; i < parsedItems.length; i++) {
+        const item = parsedItems[i];
+        const finalThumbnails = [...(item.existing_thumbnails || [])];
+        const finalOriginals = [...(item.existing_original_thumbnails || [])];
+        
+        const newCount = parseInt(item.new_thumbnails_count) || 0;
+        for (let j = 0; j < newCount; j++) {
+          const fileKey = `slot_${i}_thumbnail_${j}`;
+          const file = uploadedFileMap.get(fileKey);
+          if (file) {
+            const thumbFilename = `thumb-${path.parse(file.filename).name}.jpg`;
+            try {
+              await generateImageThumbnail(file.path, thumbFilename);
+              if (file.filename !== thumbFilename) {
+                try {
+                  fs.unlinkSync(file.path);
+                } catch (unlinkErr) {
+                  console.warn('[Autolive] Failed to delete original uploaded file:', unlinkErr.message);
+                }
+              }
+              finalOriginals.push(thumbFilename);
+              finalThumbnails.push(`/uploads/thumbnails/${thumbFilename}`);
+            } catch (thumbErr) {
+              console.error('[Autolive] Error generating thumbnail on save:', thumbErr);
+              finalOriginals.push(file.filename);
+              finalThumbnails.push(`/uploads/thumbnails/${file.filename}`);
+            }
+          }
+        }
+
+        let oldIndex = 0;
+        const matchedOld = existingItems.find(oldItem => 
+          (oldItem.video_id && oldItem.video_id === item.video_id) ||
+          (oldItem.internal_playlist_id && oldItem.internal_playlist_id === item.internal_playlist_id)
+        );
+        if (matchedOld) {
+          oldIndex = matchedOld.current_index || 0;
+        }
+        
+        await Autolive.addItem({
+          series_id: req.params.id,
+          video_id: item.video_id || null,
+          internal_playlist_id: item.internal_playlist_id || null,
+          titles: item.titles || [],
+          description: item.description || '',
+          tags: item.tags || '',
+          thumbnails: finalThumbnails,
+          original_thumbnails: finalOriginals,
+          current_index: oldIndex,
+          order_index: i
+        });
+      }
+    }
+    
+    require('./services/autoliveService').checkAutoliveSeries().catch(err => {
+      console.error('Error triggering autolive check after update:', err);
+    });
+    require('./services/autoliveService').syncCurrentMetadataNow(req.params.id).catch(err => {
+      console.error('Error syncing autolive metadata after update:', err);
+    });
+
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+app.delete('/api/autolive/:id', isAuthenticated, async (req, res) => {
+  try {
+    const Autolive = require('./models/Autolive');
+    const series = await Autolive.findById(req.params.id);
+    if (!series) return res.status(404).json({ success: false, error: 'Series not found' });
+    if (series.user_id !== req.session.userId) {
+      return res.status(403).json({ success: false, error: 'Not authorized to delete this series' });
+    }
+
+    const streamId = `autolive_${req.params.id}`;
+    const linkedStream = await Stream.findById(streamId);
+    if (linkedStream && linkedStream.user_id === req.session.userId) {
+      if (linkedStream.status === 'live') {
+        try {
+          const stopResult = await streamingService.stopStream(streamId, {
+            reason: 'user_stop',
+            message: 'Live dihentikan karena seri Autolive dihapus oleh user.'
+          });
+          if (!stopResult.success && stopResult.error !== 'Stream is not active') {
+            console.error('Error stopping linked autolive stream before delete:', stopResult.error);
+          }
+        } catch (stopError) {
+          console.error('Error stopping linked autolive stream before delete:', stopError);
+        }
+      }
+      await Stream.delete(streamId, req.session.userId);
+    }
+
+    await Autolive.delete(req.params.id, req.session.userId);
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+app.post('/api/autolive/:id/toggle', isAuthenticated, async (req, res) => {
+  try {
+    const Autolive = require('./models/Autolive');
+    const series = await Autolive.findById(req.params.id);
+    if (!series) return res.status(404).json({ success: false, error: 'Series not found' });
+    
+    const newActive = series.is_active === 1 ? 0 : 1;
+    await Autolive.update(req.params.id, { is_active: newActive });
+    
+    if (newActive === 0 && series.status === 'live') {
+      const autoliveService = require('./services/autoliveService');
+      autoliveService.stopAutoliveStream(series).catch(err => {
+        console.error('Error stopping autolive stream on toggle:', err);
+      });
+    } else if (newActive === 1) {
+      require('./services/autoliveService').checkAutoliveSeries().catch(err => {
+        console.error('Error triggering autolive check after toggle:', err);
+      });
+    }
+
+    res.json({ success: true, is_active: newActive });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+
 const server = app.listen(port, '0.0.0.0', async () => {
   try {
     await initializeDatabase();
