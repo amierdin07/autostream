@@ -1,0 +1,14 @@
+node_modules
+public/uploads/
+logs/
+
+# ignore real env from repo
+.env
+# Databases and SQLite files
+*.sqlite
+*.sqlite3
+*.db
+db/
+
+# Local configuration
+.env

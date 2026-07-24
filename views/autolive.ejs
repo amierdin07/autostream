@@ -1,0 +1,1565 @@
+<% layout('layout') -%>
+
+<div class="flex flex-col md:flex-row md:items-center justify-between mb-6 gap-4">
+  <div>
+    <h2 class="text-2xl font-bold flex items-center gap-2">
+      <i class="ti ti-bolt text-primary"></i>
+      <span>Autolive Series</span>
+    </h2>
+    <p class="text-gray-400 text-sm mt-1">Jadwalkan siaran rutin dengan rotasi judul dan thumbnail otomatis</p>
+  </div>
+  <% if (youtubeConnected) { %>
+  <button onclick="openCreateSeriesModal()" class="w-full md:w-auto flex items-center justify-center gap-2 bg-primary hover:bg-blue-600 text-white px-4 py-2 rounded-lg transition-colors">
+    <i class="ti ti-plus"></i>
+    <span>Buat Autolive Baru</span>
+  </button>
+  <% } %>
+</div>
+
+<% if (!youtubeConnected) { %>
+<div class="bg-yellow-900/20 border border-yellow-600/30 rounded-lg p-6 mb-6">
+  <div class="flex items-start gap-4">
+    <div class="w-12 h-12 bg-yellow-500/20 rounded-full flex items-center justify-center flex-shrink-0">
+      <i class="ti ti-brand-youtube text-yellow-400 text-2xl"></i>
+    </div>
+    <div>
+      <h3 class="text-lg font-medium text-yellow-200">YouTube Connection Required</h3>
+      <p class="text-yellow-300/80 mt-1">To use Autolive, you need to connect your YouTube account first.</p>
+      <a href="/settings?activeTab=integration" class="inline-flex items-center gap-2 mt-3 px-4 py-2 bg-yellow-600 hover:bg-yellow-500 text-white rounded-lg transition-colors">
+        <i class="ti ti-plug"></i>
+        <span>Connect YouTube</span>
+      </a>
+    </div>
+  </div>
+</div>
+<% } else { %>
+
+<div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6" id="series-grid">
+  <% if (series && series.length > 0) { %>
+    <% series.forEach(item => { %>
+      <div class="bg-dark-800 border border-gray-700/50 rounded-xl overflow-hidden hover:border-primary/50 transition-all group" data-series-id="<%= item.id %>">
+        <div class="p-5">
+          <div class="flex justify-between items-start mb-4">
+            <div class="flex items-center gap-3">
+              <div class="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center text-primary">
+                <i class="ti ti-bolt text-xl"></i>
+              </div>
+              <div>
+                <h3 class="font-bold text-white group-hover:text-primary transition-colors"><%= item.name %></h3>
+                <div class="flex flex-wrap items-center gap-1.5 mt-1">
+                    <span class="text-[9px] bg-dark-900 text-gray-400 px-1.5 py-0.5 rounded border border-gray-700/50 flex items-center gap-1">
+                        <i class="ti ti-<%= item.internal_playlist_id ? 'list-details' : 'video' %> text-[10px]"></i>
+                        <span class="max-w-[100px] truncate"><%= item.internal_playlist_id ? item.internal_playlist_name : item.video_title %></span>
+                    </span>
+                    <span class="text-[9px] text-primary font-bold bg-primary/10 px-1.5 py-0.5 rounded border border-primary/20">
+                        <%= item.current_item_index + 1 %> / <%= item.item_count %>
+                    </span>
+                    <% if (item.status === 'live' && item.current_item_title) { %>
+                        <div class="w-full mt-1.5 text-[10px] text-green-400 font-medium flex items-center gap-1">
+                            <i class="ti ti-typography"></i>
+                            <span class="truncate italic">"<%= item.current_item_title %>"</span>
+                        </div>
+                    <% } %>
+                </div>
+              </div>
+            </div>
+            <div class="flex items-center gap-2">
+              <button onclick="editSeries('<%= item.id %>')" class="p-2 text-gray-400 hover:text-white hover:bg-gray-700 rounded-lg transition-all" title="Edit">
+                <i class="ti ti-edit"></i>
+              </button>
+              <button onclick="deleteSeries('<%= item.id %>')" class="p-2 text-gray-400 hover:text-red-500 hover:bg-red-500/10 rounded-lg transition-all" title="Delete">
+                <i class="ti ti-trash"></i>
+              </button>
+            </div>
+          </div>
+
+          <div class="space-y-3">
+            <div class="flex items-center justify-between text-sm">
+              <span class="text-gray-400">Status</span>
+              <div class="flex items-center gap-2">
+                <% if (item.status === 'live') { %>
+                  <span id="status-badge-<%= item.id %>" class="flex items-center text-green-400 text-xs font-bold uppercase tracking-wider">
+                    <span class="w-2 h-2 bg-green-400 rounded-full animate-pulse mr-1.5"></span>
+                    LIVE NOW
+                  </span>
+                <% } else if (item.is_active) { %>
+                  <span id="status-badge-<%= item.id %>" class="text-blue-400 text-xs font-bold uppercase tracking-wider">SCHEDULED</span>
+                <% } else { %>
+                  <span id="status-badge-<%= item.id %>" class="text-gray-500 text-xs font-bold uppercase tracking-wider">INACTIVE</span>
+                <% } %>
+                
+                <label class="relative inline-flex items-center cursor-pointer ml-2">
+                  <input type="checkbox" value="" class="sr-only peer" <%= item.is_active ? 'checked' : '' %> onchange="toggleSeries('<%= item.id %>')">
+                  <div class="w-9 h-5 bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-primary"></div>
+                </label>
+              </div>
+            </div>
+
+            <div class="flex items-center justify-between text-sm">
+              <span class="text-gray-400">YouTube Settings</span>
+              <div class="flex items-center gap-2">
+                <span class="text-xs <%= item.privacy === 'public' ? 'text-green-400' : 'text-gray-400' %> uppercase"><%= item.privacy %></span>
+                <% if (item.monetization_enabled) { %>
+                  <i class="ti ti-currency-dollar text-green-500" title="Monetization Enabled"></i>
+                <% } %>
+              </div>
+            </div>
+
+            <div class="flex items-center justify-between text-sm">
+              <span class="text-gray-400">Jadwal</span>
+              <span class="text-white font-medium flex items-center gap-1.5">
+                <i class="ti ti-calendar-event text-gray-500"></i>
+                <%= item.repeat_mode === 'none' ? 'Sekali Saja' : item.repeat_mode.charAt(0).toUpperCase() + item.repeat_mode.slice(1) %>
+              </span>
+            </div>
+
+            <div class="flex items-center justify-between text-sm">
+              <span class="text-gray-400">Mulai Berikutnya</span>
+              <span class="text-amber-400 font-mono text-xs">
+                <%= helpers.formatDateTime(item.start_time) %>
+              </span>
+            </div>
+
+            <!-- Video Schedule List -->
+            <% if (item.schedule && item.schedule.length > 0) { %>
+            <div class="mt-4 pt-4 border-t border-gray-700/50">
+              <div class="flex items-center justify-between mb-2">
+                <div class="flex items-center gap-1.5">
+                  <span class="text-xs font-bold text-gray-500 uppercase tracking-wider">Daftar Jadwal Video</span>
+                  <a href="/api/autolive/<%= item.id %>/download-schedule" class="p-1 text-gray-500 hover:text-primary hover:bg-gray-700/30 rounded-md transition-all flex items-center justify-center" title="Unduh Jadwal (.txt)" download>
+                    <i class="ti ti-download text-xs"></i>
+                  </a>
+                </div>
+                <span class="text-[10px] text-primary bg-primary/10 px-1.5 py-0.5 rounded border border-primary/20">Next 5</span>
+              </div>
+              <div class="space-y-2 max-h-[160px] overflow-y-auto pr-1 custom-scrollbar">
+                <% item.schedule.forEach((sched, idx) => { %>
+                  <div class="flex items-center gap-3 p-2 rounded-lg bg-dark-900/30 border border-gray-700/30 hover:border-primary/30 transition-colors group/item">
+                    <div class="w-10 h-6 rounded overflow-hidden bg-gray-800 flex-shrink-0 border border-gray-700/50">
+                      <% if (sched.thumbnail) { %>
+                        <img src="<%= sched.thumbnail %>" class="w-full h-full object-cover group-hover/item:scale-110 transition-transform duration-500">
+                      <% } else { %>
+                        <div class="w-full h-full flex items-center justify-center bg-gray-700/30">
+                          <i class="ti ti-photo text-[10px] text-gray-600"></i>
+                        </div>
+                      <% } %>
+                    </div>
+                    <div class="flex-1 min-w-0">
+                      <div class="text-[11px] font-medium text-gray-200 truncate group-hover/item:text-primary transition-colors cursor-pointer" 
+                           onclick="openSchedulePreview('<%= sched.thumbnail %>', '<%= sched.title.replace(/'/g, "\\'") %>', '<%= helpers.formatDateTime(sched.startTime.toISOString()) %>')"
+                           title="Klik untuk lihat thumbnail">
+                        <%= sched.title %>
+                      </div>
+                      <div class="flex items-center gap-1.5 mt-0.5 flex-wrap">
+                        <% if (sched.status === 'Sedang Berlangsung') { %>
+                          <span class="px-1 py-0.5 rounded text-[8px] font-bold bg-red-500/10 text-red-400 border border-red-500/20">LIVE</span>
+                        <% } else if (sched.status === 'Sudah Selesai') { %>
+                          <span class="px-1 py-0.5 rounded text-[8px] font-bold bg-green-500/10 text-green-400 border border-green-500/20">SUDAH</span>
+                        <% } else if (sched.status === 'Gagal') { %>
+                          <span class="px-1 py-0.5 rounded text-[8px] font-bold bg-red-500/10 text-red-500 border border-red-500/20">GAGAL</span>
+                        <% } else { %>
+                          <span class="px-1 py-0.5 rounded text-[8px] font-bold bg-amber-500/10 text-amber-400 border border-amber-500/20">AKAN TAYANG</span>
+                        <% } %>
+                        <span class="text-[9px] text-amber-400/80 font-mono"><%= helpers.formatDateTime(sched.startTime.toISOString()) %></span>
+                        <span class="text-[9px] text-gray-600">•</span>
+                        <span class="text-[9px] text-gray-500">Video <%= sched.index %></span>
+                      </div>
+                    </div>
+                  </div>
+                <% }) %>
+              </div>
+            </div>
+            <% } %>
+          </div>
+        </div>
+        
+        <div class="bg-dark-900/50 px-5 py-3 border-t border-gray-700/50 flex items-center justify-between">
+            <a href="<%= item.youtube_broadcast_id ? `https://studio.youtube.com/video/${item.youtube_broadcast_id}/livestreaming` : 'https://studio.youtube.com' %>" target="_blank" class="flex items-center gap-2 text-xs text-gray-400 hover:text-primary transition-colors group">
+                <i class="ti ti-brand-youtube text-red-500 group-hover:scale-110 transition-transform"></i>
+                <span class="truncate max-w-[150px] font-medium"><%= item.youtube_channel_name || 'No Channel' %></span>
+                <i class="ti ti-external-link text-[10px] opacity-0 group-hover:opacity-100 transition-opacity"></i>
+            </a>
+            <div class="text-[10px] text-gray-500 uppercase tracking-tighter">
+                ID: <%= item.id.substring(0, 8) %>
+            </div>
+        </div>
+      </div>
+    <% }) %>
+  <% } else { %>
+    <div class="col-span-full py-20 flex flex-col items-center justify-center bg-dark-800 rounded-2xl border-2 border-dashed border-gray-700">
+      <div class="w-20 h-20 bg-gray-700/30 rounded-full flex items-center justify-center mb-4">
+        <i class="ti ti-bolt-off text-4xl text-gray-500"></i>
+      </div>
+      <h3 class="text-xl font-bold text-white mb-2">Belum ada Autolive</h3>
+      <p class="text-gray-400 text-center max-w-sm mb-6">Mulai otomatisasi siaran rutin kamu dengan klik tombol di bawah.</p>
+      <button onclick="openCreateSeriesModal()" class="flex items-center gap-2 bg-primary hover:bg-blue-600 text-white px-6 py-3 rounded-xl transition-all shadow-lg shadow-primary/20">
+        <i class="ti ti-plus"></i>
+        <span>Buat Autolive Pertama</span>
+      </button>
+    </div>
+  <% } %>
+</div>
+
+<% } %>
+
+<!-- Create/Edit Modal -->
+<div id="autoliveModal" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-dark-800 w-full max-w-4xl max-h-[90vh] rounded-2xl shadow-2xl border border-gray-700 overflow-hidden flex flex-col">
+        <div class="px-6 py-4 border-b border-gray-700 flex items-center justify-between flex-shrink-0">
+            <h3 class="text-xl font-bold flex items-center gap-2" id="modalTitle">
+                <i class="ti ti-bolt text-primary"></i>
+                <span>Buat Autolive Baru</span>
+            </h3>
+            <button onclick="closeModal()" class="text-gray-400 hover:text-white transition-colors p-2 hover:bg-gray-700 rounded-lg">
+                <i class="ti ti-x text-2xl"></i>
+            </button>
+        </div>
+
+        <div class="flex-1 overflow-y-auto p-6 custom-scrollbar">
+            <form id="autoliveForm" class="space-y-8">
+                <input type="hidden" id="seriesId">
+                
+                <!-- Section 1: Basic Config -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-400 mb-1.5">Nama Seri</label>
+                            <input type="text" id="seriesName" class="w-full bg-dark-900 border border-gray-700 rounded-xl px-4 py-3 text-white focus:ring-2 focus:ring-primary focus:border-transparent transition-all" placeholder="Contoh: Monday Music Live">
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-medium text-gray-400 mb-1.5">YouTube Channel</label>
+                            <select id="channelId" class="w-full bg-dark-900 border border-gray-700 rounded-xl px-4 py-3 text-white focus:ring-2 focus:ring-primary focus:border-transparent transition-all">
+                                <% youtubeChannels.forEach(c => { %>
+                                    <option value="<%= c.id %>"><%= c.channel_name %></option>
+                                <% }) %>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-400 mb-1.5">Waktu Mulai Pertama</label>
+                            <input type="datetime-local" id="startTime" class="w-full bg-dark-900 border border-gray-700 rounded-xl px-4 py-3 text-white focus:ring-2 focus:ring-primary focus:border-transparent transition-all">
+                        </div>
+
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-400 mb-1.5">Pengulangan</label>
+                                <select id="repeatMode" class="w-full bg-dark-900 border border-gray-700 rounded-xl px-4 py-3 text-white focus:ring-2 focus:ring-primary focus:border-transparent transition-all">
+                                    <option value="none">Sekali Saja</option>
+                                    <option value="nonstop">Nonstop (Auto Restart)</option>
+                                    <option value="daily">Setiap Hari</option>
+                                    <option value="weekly">Setiap Minggu (Weekly)</option>
+                                    <option value="monday">Setiap Senin</option>
+                                    <option value="tuesday">Setiap Selasa</option>
+                                    <option value="wednesday">Setiap Rabu</option>
+                                    <option value="thursday">Setiap Kamis</option>
+                                    <option value="friday">Setiap Jumat</option>
+                                    <option value="saturday">Setiap Sabtu</option>
+                                    <option value="sunday">Setiap Minggu (Hari)</option>
+                                    <option value="every_2_days">Setiap 2 Hari</option>
+                                    <option value="every_3_days">Setiap 3 Hari</option>
+                                    <option value="every_4_days">Setiap 4 Hari</option>
+                                    <option value="every_5_days">Setiap 5 Hari</option>
+                                    <option value="custom">Pilih Tanggal Spesifik</option>
+                                </select>
+                            </div>
+
+                            <div id="dailyTimesContainer" class="col-span-2 hidden bg-dark-900/50 p-4 rounded-xl border border-primary/20 mb-4">
+                                <label class="block text-sm font-medium text-gray-400 mb-1.5">Jam Live Harian (Pisahkan dengan koma)</label>
+                                <input type="text" id="dailyTimes" class="w-full bg-dark-800 border border-gray-700 rounded-xl px-4 py-3 text-white focus:ring-2 focus:ring-primary focus:border-transparent transition-all" placeholder="Contoh: 09:00, 13:00, 17:00, 21:00">
+                                <span class="text-xs text-gray-500 mt-1 block">Tulis beberapa waktu mulai live dalam format HH:MM, pisahkan dengan koma (misal: 08:30, 12:00, 16:30, 20:00)</span>
+                            </div>
+
+                            <div id="customDatesContainer" class="col-span-2 hidden bg-dark-900/50 p-4 rounded-xl border border-primary/20 mb-4">
+                                <label class="block text-sm font-medium text-primary mb-2 flex items-center gap-2">
+                                    <i class="ti ti-calendar-plus"></i>
+                                    <span>Pilih Tanggal-Tanggal Live</span>
+                                </label>
+                                <div class="flex gap-2 mb-3">
+                                    <div class="relative flex-1">
+                                        <div class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">
+                                            <i class="ti ti-calendar"></i>
+                                        </div>
+                                        <input type="date" id="datePicker" onclick="this.showPicker()" class="w-full bg-dark-800 border border-gray-700 rounded-xl pl-10 pr-4 py-3 text-white text-sm focus:ring-2 focus:ring-primary focus:border-transparent transition-all cursor-pointer">
+                                    </div>
+                                    <button type="button" onclick="addCustomDate()" class="bg-primary hover:bg-blue-600 text-white px-6 py-3 rounded-xl text-sm font-bold transition-all flex items-center gap-2 shadow-lg shadow-primary/20">
+                                        <i class="ti ti-plus"></i> Tambah
+                                    </button>
+                                </div>
+                                <div id="customDatesList" class="flex flex-wrap gap-2 min-h-[40px] p-2 bg-dark-800/50 rounded-xl border border-gray-700/50">
+                                    <span class="text-xs text-gray-500 italic w-full text-center py-1" id="noDatesHint">Belum ada tanggal dipilih</span>
+                                </div>
+                            </div>
+                            <div class="col-span-2">
+                                <label class="block text-sm font-medium text-gray-400 mb-1.5">Durasi Live</label>
+                                <div class="grid grid-cols-2 gap-2">
+                                    <div class="relative">
+                                        <input type="number" id="durationHours" class="w-full bg-dark-900 border border-gray-700 rounded-xl px-4 py-3 text-white focus:ring-2 focus:ring-primary focus:border-transparent transition-all pr-10" placeholder="0" value="4">
+                                        <span class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 text-xs">Jam</span>
+                                    </div>
+                                    <div class="relative">
+                                        <input type="number" id="durationMinutes" class="w-full bg-dark-900 border border-gray-700 rounded-xl px-4 py-3 text-white focus:ring-2 focus:ring-primary focus:border-transparent transition-all pr-12" placeholder="0" value="0">
+                                        <span class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 text-xs">Menit</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="h-px bg-gray-700 my-8"></div>
+
+                <!-- Section 1.5: YouTube Advanced Settings -->
+                <div class="space-y-6">
+                    <h4 class="text-lg font-bold flex items-center gap-2">
+                        <i class="ti ti-brand-youtube text-red-500"></i>
+                        <span>YouTube Advanced Settings</span>
+                    </h4>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 bg-dark-900/30 p-6 rounded-2xl border border-gray-700/50">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-400 mb-1.5">Privacy</label>
+                            <select id="privacy" class="w-full bg-dark-900 border border-gray-700 rounded-xl px-4 py-3 text-white focus:ring-2 focus:ring-primary focus:border-transparent transition-all">
+                                <option value="public" selected>Public</option>
+                                <option value="unlisted">Unlisted</option>
+                                <option value="private">Private</option>
+                            </select>
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-medium text-gray-400 mb-1.5">Kategori (Genre)</label>
+                            <select id="categoryId" class="w-full bg-dark-900 border border-gray-700 rounded-xl px-4 py-3 text-white focus:ring-2 focus:ring-primary focus:border-transparent transition-all">
+                                <option value="10" selected>Music</option>
+                                <option value="20">Gaming</option>
+                                <option value="24">Entertainment</option>
+                                <option value="22">People & Blogs</option>
+                                <option value="27">Education</option>
+                                <option value="1">Film & Animation</option>
+                                <option value="2">Autos & Vehicles</option>
+                                <option value="15">Pets & Animals</option>
+                                <option value="17">Sports</option>
+                                <option value="19">Travel & Events</option>
+                                <option value="23">Comedy</option>
+                                <option value="25">News & Politics</option>
+                                <option value="26">Howto & Style</option>
+                                <option value="28">Science & Technology</option>
+                            </select>
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-medium text-gray-400 mb-1.5">Monetisasi & Kids</label>
+                            <div class="space-y-2 mt-2">
+                                <label class="flex items-center gap-2 cursor-pointer group">
+                                    <input type="checkbox" id="monetizationEnabled" class="w-4 h-4 rounded border-gray-700 bg-dark-900 text-primary focus:ring-primary" checked>
+                                    <span class="text-sm text-gray-300 group-hover:text-white transition-colors">Aktifkan Iklan</span>
+                                </label>
+                                <label class="flex items-center gap-2 cursor-pointer group">
+                                    <input type="checkbox" id="madeForKids" class="w-4 h-4 rounded border-gray-700 bg-dark-900 text-primary focus:ring-primary">
+                                    <span class="text-sm text-gray-300 group-hover:text-white transition-colors">Dibuat untuk Anak</span>
+                                </label>
+                            </div>
+                        </div>
+
+                        <div class="md:col-span-3">
+                            <label class="block text-sm font-medium text-gray-400 mb-1.5">Pilih Playlist YouTube (Opsional)</label>
+                            <select id="playlistId" class="w-full bg-dark-900 border border-gray-700 rounded-xl px-4 py-3 text-white focus:ring-2 focus:ring-primary focus:border-transparent transition-all">
+                                <option value="">-- Tanpa Playlist --</option>
+                            </select>
+                            <p class="text-[10px] text-gray-500 mt-1" id="playlistHint">Pilih channel terlebih dahulu untuk memuat playlist.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="h-px bg-gray-700 my-8"></div>
+
+                <!-- Section 2: Video Slots & Metadata Rotation -->
+                <div class="space-y-6">
+                    <div class="flex items-center justify-between">
+                        <h4 class="text-lg font-bold flex items-center gap-2">
+                            <i class="ti ti-list-details text-primary"></i>
+                            <span>Daftar Slot Video Master & Rotasi Metadata</span>
+                        </h4>
+                        <span class="text-xs bg-primary/10 text-primary px-2 py-1 rounded">Auto-Swap Per Live Aktif</span>
+                    </div>
+
+                    <div id="slotsContainer" class="space-y-6">
+                        <!-- Dynamic slots will be rendered here -->
+                    </div>
+
+                    <button type="button" onclick="addNewSlot()" class="w-full py-4 bg-primary/10 hover:bg-primary/20 text-primary border-2 border-dashed border-primary/30 rounded-2xl font-bold transition-all flex items-center justify-center gap-2">
+                        <i class="ti ti-plus text-lg"></i>
+                        <span>Tambah Video Slot</span>
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <div class="px-6 py-4 border-t border-gray-700 flex items-center justify-end gap-3 flex-shrink-0 bg-dark-800/80 backdrop-blur-md">
+            <div id="autoliveUploadStatus" class="hidden flex-1 min-w-0">
+                <div class="flex items-center justify-between gap-3 mb-1">
+                    <span id="autoliveUploadText" class="text-xs text-gray-300 truncate">Menyiapkan upload...</span>
+                    <span id="autoliveUploadPercent" class="text-xs font-mono text-primary">0%</span>
+                </div>
+                <div class="h-1.5 bg-dark-900 rounded-full overflow-hidden border border-gray-700/60">
+                    <div id="autoliveUploadBar" class="h-full bg-primary rounded-full transition-all duration-200" style="width: 0%"></div>
+                </div>
+            </div>
+            <button onclick="closeModal()" class="px-6 py-2.5 text-gray-400 hover:text-white transition-colors font-medium">Batal</button>
+            <button onclick="saveSeries()" id="saveBtn" class="px-8 py-2.5 bg-primary hover:bg-blue-600 text-white rounded-xl font-bold transition-all shadow-lg shadow-primary/20 flex items-center gap-2">
+                <i class="ti ti-device-floppy"></i>
+                <span>Simpan Autolive</span>
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Schedule Thumbnail Preview Modal -->
+<div id="schedulePreviewModal" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-[70] hidden flex items-center justify-center p-4" onclick="closeSchedulePreview()">
+    <div class="bg-dark-800 rounded-2xl border border-gray-700 shadow-2xl overflow-hidden max-w-[400px] w-full transform transition-all duration-300 scale-95 opacity-0" id="schedulePreviewContent" onclick="event.stopPropagation()">
+        <div class="relative group">
+            <img id="schedulePreviewImage" src="" class="w-full aspect-video object-cover" alt="Schedule Thumbnail">
+            <div class="absolute inset-0 bg-gradient-to-t from-dark-800 via-transparent to-transparent opacity-60"></div>
+            <button onclick="closeSchedulePreview()" class="absolute top-3 right-3 bg-black/50 hover:bg-red-500 text-white p-2 rounded-full transition-all border border-gray-700/50">
+                <i class="ti ti-x text-lg"></i>
+            </button>
+        </div>
+        <div class="p-5">
+            <h4 id="schedulePreviewTitle" class="text-white font-bold text-sm leading-relaxed mb-3"></h4>
+            <div class="flex items-center justify-between">
+                <div id="schedulePreviewTime" class="text-amber-400 font-mono text-[11px] flex items-center gap-2 bg-amber-400/10 px-2.5 py-1.5 rounded-lg border border-amber-400/20">
+                    <i class="ti ti-clock"></i>
+                    <span></span>
+                </div>
+                <span class="text-[10px] text-gray-500 font-medium uppercase tracking-widest">Autolive Schedule</span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+    .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+    .custom-scrollbar::-webkit-scrollbar-thumb { background: #374151; border-radius: 10px; }
+    .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #4B5563; }
+</style>
+
+<script>
+    let activeUploadsCount = 0;
+    // ============================================================
+    // Modern Premium Popups System (Replaces native alerts/confirms)
+    // ============================================================
+    function showAlert(message, type = 'warning') {
+        const oldAlert = document.getElementById('customAlertModal');
+        if (oldAlert) oldAlert.remove();
+        
+        let iconClass = 'ti-alert-triangle text-amber-500 bg-amber-500/10';
+        if (type === 'success') {
+            iconClass = 'ti-circle-check text-green-500 bg-green-500/10';
+        } else if (type === 'error') {
+            iconClass = 'ti-circle-x text-red-500 bg-red-500/10';
+        } else if (type === 'info') {
+            iconClass = 'ti-info-circle text-primary bg-primary/10';
+        }
+        
+        const modal = document.createElement('div');
+        modal.id = 'customAlertModal';
+        modal.className = 'fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm transition-all duration-300 opacity-0';
+        modal.innerHTML = `
+            <div class="bg-dark-800 border border-gray-700/80 rounded-2xl w-full max-w-sm overflow-hidden shadow-2xl transform scale-95 transition-all duration-300">
+                <div class="p-6 flex flex-col items-center text-center space-y-4">
+                    <div class="w-16 h-16 rounded-full flex items-center justify-center text-3xl ${iconClass}">
+                        <i class="ti ${iconClass.split(' ')[0]}"></i>
+                    </div>
+                    <div class="space-y-1">
+                        <h4 class="text-white font-bold text-base">Notifikasi</h4>
+                        <p class="text-gray-300 text-sm leading-relaxed">${message}</p>
+                    </div>
+                </div>
+                <div class="px-6 py-4 bg-dark-900/50 border-t border-gray-700/50 flex justify-end">
+                    <button type="button" onclick="closeCustomAlert()" class="w-full py-2.5 bg-primary hover:bg-primary/90 text-white rounded-xl text-sm font-bold transition-all">
+                        Oke
+                    </button>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(modal);
+        
+        setTimeout(() => {
+            modal.classList.remove('opacity-0');
+            modal.querySelector('.transform').classList.remove('scale-95');
+        }, 10);
+    }
+    
+    function closeCustomAlert() {
+        const modal = document.getElementById('customAlertModal');
+        if (modal) {
+            modal.classList.add('opacity-0');
+            modal.querySelector('.transform').classList.add('scale-95');
+            setTimeout(() => modal.remove(), 300);
+        }
+    }
+    
+    function showConfirm(message, onConfirm, confirmText = 'Ya, Lanjutkan') {
+        const oldConfirm = document.getElementById('customConfirmModal');
+        if (oldConfirm) oldConfirm.remove();
+        
+        const modal = document.createElement('div');
+        modal.id = 'customConfirmModal';
+        modal.className = 'fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm transition-all duration-300 opacity-0';
+        modal.innerHTML = `
+            <div class="bg-dark-800 border border-gray-700/80 rounded-2xl w-full max-w-sm overflow-hidden shadow-2xl transform scale-95 transition-all duration-300">
+                <div class="p-6 flex flex-col items-center text-center space-y-4">
+                    <div class="w-16 h-16 rounded-full flex items-center justify-center text-3xl text-red-500 bg-red-500/10">
+                        <i class="ti ti-help-circle"></i>
+                    </div>
+                    <div class="space-y-1">
+                        <h4 class="text-white font-bold text-base">Konfirmasi</h4>
+                        <p class="text-gray-300 text-sm leading-relaxed">${message}</p>
+                    </div>
+                </div>
+                <div class="px-6 py-4 bg-dark-900/50 border-t border-gray-700/50 flex items-center gap-3">
+                    <button type="button" onclick="closeCustomConfirm(false)" class="flex-1 py-2.5 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-xl text-sm font-semibold transition-all">
+                        Batal
+                    </button>
+                    <button type="button" id="confirmOkBtn" class="flex-1 py-2.5 bg-red-600 hover:bg-red-500 text-white rounded-xl text-sm font-bold transition-all">
+                        ${confirmText}
+                    </button>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(modal);
+        
+        modal.querySelector('#confirmOkBtn').onclick = () => {
+            closeCustomConfirm(true, onConfirm);
+        };
+        
+        setTimeout(() => {
+            modal.classList.remove('opacity-0');
+            modal.querySelector('.transform').classList.remove('scale-95');
+        }, 10);
+    }
+    
+    function closeCustomConfirm(isConfirmed, callback) {
+        const modal = document.getElementById('customConfirmModal');
+        if (modal) {
+            modal.classList.add('opacity-0');
+            modal.querySelector('.transform').classList.add('scale-95');
+            setTimeout(() => {
+                modal.remove();
+                if (isConfirmed && typeof callback === 'function') {
+                    callback();
+                }
+            }, 300);
+        }
+    }
+
+    let currentItems = [];
+    let currentSlots = [];
+    let selectedDates = [];
+    let uploadedThumbnailPaths = [];
+    let sharedTags = [];
+
+    document.getElementById('repeatMode').addEventListener('change', function() {
+        const container = document.getElementById('customDatesContainer');
+        if (this.value === 'custom') {
+            container.classList.remove('hidden');
+        } else {
+            container.classList.add('hidden');
+        }
+
+        const dailyTimesContainer = document.getElementById('dailyTimesContainer');
+        if (this.value === 'daily') {
+            dailyTimesContainer.classList.remove('hidden');
+        } else {
+            dailyTimesContainer.classList.add('hidden');
+        }
+    });
+
+    document.getElementById('channelId').addEventListener('change', function() {
+        loadPlaylists(this.value);
+    });
+
+    async function loadPlaylists(channelId, selectedPlaylistId = '') {
+        const select = document.getElementById('playlistId');
+        const hint = document.getElementById('playlistHint');
+        
+        if (!channelId) {
+            select.innerHTML = '<option value="">-- Tanpa Playlist --</option>';
+            hint.innerText = 'Pilih channel terlebih dahulu untuk memuat playlist.';
+            return;
+        }
+
+        hint.innerText = 'Memuat playlist...';
+        select.disabled = true;
+
+        try {
+            const response = await fetch(`/api/youtube/playlists/${channelId}`);
+            const result = await response.json();
+            
+            if (result.success) {
+                select.innerHTML = '<option value="">-- Tanpa Playlist --</option>';
+                result.playlists.forEach(p => {
+                    const option = document.createElement('option');
+                    option.value = p.id;
+                    option.text = p.title;
+                    if (p.id === selectedPlaylistId) option.selected = true;
+                    select.appendChild(option);
+                });
+                hint.innerText = `Berhasil memuat ${result.playlists.length} playlist.`;
+            } else {
+                hint.innerText = 'Gagal memuat playlist.';
+            }
+        } catch (e) {
+            console.error('Error fetching playlists:', e);
+            hint.innerText = 'Gagal memuat playlist.';
+        } finally {
+            select.disabled = false;
+        }
+    }
+
+    function addCustomDate() {
+        const picker = document.getElementById('datePicker');
+        const date = picker.value;
+        if (!date) return;
+        
+        if (selectedDates.includes(date)) return;
+        
+        selectedDates.push(date);
+        selectedDates.sort();
+        renderCustomDates();
+        picker.value = '';
+    }
+
+    function removeCustomDate(date) {
+        selectedDates = selectedDates.filter(d => d !== date);
+        renderCustomDates();
+    }
+
+    function renderCustomDates() {
+        const container = document.getElementById('customDatesList');
+        container.innerHTML = '';
+        
+        if (selectedDates.length === 0) {
+            container.innerHTML = '<span class="text-xs text-gray-500 italic w-full text-center py-1" id="noDatesHint">Belum ada tanggal dipilih</span>';
+            return;
+        }
+        
+        selectedDates.forEach(date => {
+            const badge = document.createElement('div');
+            badge.className = 'flex items-center gap-2 bg-primary/20 text-primary border border-primary/30 px-2 py-1 rounded-lg text-xs font-medium';
+            badge.innerHTML = `
+                <span>${date}</span>
+                <button type="button" onclick="removeCustomDate('${date}')" class="hover:text-white">
+                    <i class="ti ti-x"></i>
+                </button>
+            `;
+            container.appendChild(badge);
+        });
+    }
+
+    function openCreateSeriesModal() {
+        document.getElementById('seriesId').value = '';
+        document.getElementById('modalTitle').innerHTML = '<i class="ti ti-bolt text-primary"></i><span>Buat Autolive Baru</span>';
+        document.getElementById('seriesName').value = '';
+        document.getElementById('startTime').value = '';
+        document.getElementById('customDatesContainer').classList.add('hidden');
+        document.getElementById('customDatesList').innerHTML = '';
+        
+        // Reset new custom fields
+        document.getElementById('dailyTimes').value = '';
+        document.getElementById('dailyTimesContainer').classList.add('hidden');
+        
+        // Reset YouTube settings to defaults
+        document.getElementById('privacy').value = 'public';
+        document.getElementById('categoryId').value = '10';
+        document.getElementById('monetizationEnabled').checked = true;
+        document.getElementById('madeForKids').checked = false;
+        document.getElementById('playlistId').innerHTML = '<option value="">-- Tanpa Playlist --</option>';
+
+        // Load playlists for initial channel
+        const initialChannelId = document.getElementById('channelId').value;
+        if (initialChannelId) loadPlaylists(initialChannelId);
+
+        currentSlots = [];
+        selectedDates = [];
+        addNewSlot(); // Add one default slot
+        setAutoliveSaving(false);
+        document.getElementById('autoliveModal').classList.remove('hidden');
+        document.getElementById('autoliveModal').classList.add('flex');
+    }
+
+    // ============================================================
+    // Slot Management JavaScript Functions
+    // ============================================================
+    function renderSlots() {
+        const container = document.getElementById('slotsContainer');
+        container.innerHTML = '';
+        
+        currentSlots.forEach((slot, index) => {
+            const slotEl = document.createElement('div');
+            slotEl.className = "bg-dark-900/50 p-6 rounded-2xl border border-gray-700 space-y-4 relative";
+            
+            let optionsHtml = `<option value="">-- Pilih Video atau Playlist --</option>`;
+            autoliveAllItems.forEach(item => {
+                const val = `${item.type}:${item.id}`;
+                const selected = (slot.video_id === item.id || slot.internal_playlist_id === item.id) ? 'selected' : '';
+                const typeLabel = item.type === 'playlist' ? '[Playlist] ' : '[Video] ';
+                optionsHtml += `<option value="${val}" ${selected}>${typeLabel}${item.label} ${item.sub ? `(${item.sub})` : ''}</option>`;
+            });
+            
+            slotEl.innerHTML = `
+                <div class="flex items-center justify-between pb-3 border-b border-gray-700">
+                    <h5 class="text-sm font-bold text-gray-300 flex items-center gap-2">
+                        <i class="ti ti-video text-primary"></i>
+                        <span>Slot Video Master #${index + 1}</span>
+                    </h5>
+                    <button type="button" onclick="removeSlot(${index})" class="text-red-400 hover:text-red-300 text-xs font-semibold flex items-center gap-1">
+                        <i class="ti ti-trash"></i> Hapus Slot
+                    </button>
+                </div>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-xs font-medium text-gray-400 mb-1">Pilih Video/Playlist</label>
+                            <select onchange="updateSlotVideo(${index}, this.value)" class="w-full bg-dark-800 border border-gray-700 rounded-xl px-3 py-2.5 text-xs text-white focus:ring-1 focus:ring-primary focus:border-transparent">
+                                ${optionsHtml}
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-gray-400 mb-1">Daftar Judul (Satu per baris)</label>
+                            <textarea oninput="updateSlotTitles(${index}, this.value)" rows="4" class="w-full bg-dark-800 border border-gray-700 rounded-xl px-3 py-2 text-white font-mono text-xs focus:ring-1 focus:ring-primary focus:border-transparent" placeholder="Judul 1&#10;Judul 2...">${slot.titles.join('\n')}</textarea>
+                        </div>
+                    </div>
+                    
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-xs font-medium text-gray-400 mb-1">Deskripsi Live (Khusus Slot Ini)</label>
+                            <textarea oninput="updateSlotDescription(${index}, this.value)" rows="2" class="w-full bg-dark-800 border border-gray-700 rounded-xl px-3 py-2 text-white text-xs focus:ring-1 focus:ring-primary focus:border-transparent" placeholder="Deskripsi untuk live video ini...">${slot.description || ''}</textarea>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-gray-400 mb-1">Tag Live (Pisahkan dengan koma)</label>
+                            <input type="text" oninput="updateSlotTags(${index}, this.value)" value="${slot.tags || ''}" class="w-full bg-dark-800 border border-gray-700 rounded-xl px-3 py-2 text-white text-xs focus:ring-1 focus:ring-primary focus:border-transparent" placeholder="tag1, tag2, tag3">
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="space-y-2 pt-2">
+                    <label class="block text-xs font-medium text-gray-400">Rotasi Thumbnail (Banyak File)</label>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div class="relative group h-[90px] md:col-span-1">
+                            <input type="file" multiple accept="image/*" onchange="handleSlotFiles(${index}, this.files)" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10">
+                            <div class="w-full h-full border border-dashed border-gray-700 rounded-xl flex flex-col items-center justify-center group-hover:border-primary transition-all bg-dark-800/30">
+                                <i class="ti ti-photo-plus text-xl text-gray-505 mb-1 group-hover:text-primary"></i>
+                                <span class="text-[10px] text-gray-400">Klik / Seret Gambar</span>
+                            </div>
+                        </div>
+                        <div class="md:col-span-2 flex flex-wrap gap-2 items-center p-2 bg-dark-800/30 border border-gray-800 rounded-xl min-h-[90px]" id="slot-thumbs-preview-${index}">
+                            ${renderSlotThumbsPreview(index)}
+                        </div>
+                    </div>
+                </div>
+                
+                <div id="slot-seo-preview-${index}" class="mt-4 space-y-2 hidden"></div>
+                
+                <button type="button" onclick="generateSlotSEO(${index})" class="w-full py-2 bg-gray-850 hover:bg-gray-800 text-white rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 mt-2">
+                    <i class="ti ti-refresh"></i> Generate SEO Khusus Slot Ini
+                </button>
+            `;
+            container.appendChild(slotEl);
+            
+            // Auto render preview if titles are already populated (e.g. during edits)
+            if (slot.titles && slot.titles.length > 0) {
+                setTimeout(() => generateSlotSEO(index, true), 20);
+            }
+        });
+    }
+
+    function updateSlotVideo(index, val) {
+        if (!val) {
+            currentSlots[index].video_id = "";
+            currentSlots[index].internal_playlist_id = "";
+            return;
+        }
+        const parts = val.split(':');
+        const type = parts[0];
+        const id = parts[1];
+        if (type === 'playlist') {
+            currentSlots[index].internal_playlist_id = id;
+            currentSlots[index].video_id = "";
+        } else {
+            currentSlots[index].video_id = id;
+            currentSlots[index].internal_playlist_id = "";
+        }
+    }
+
+    function updateSlotTitles(index, val) {
+        currentSlots[index].titles = val.split('\n').map(t => t.trim()).filter(Boolean);
+    }
+
+    function updateSlotDescription(index, val) {
+        currentSlots[index].description = val;
+    }
+
+    function updateSlotTags(index, val) {
+        currentSlots[index].tags = val;
+    }
+
+    async function handleSlotFiles(index, files) {
+        if (files.length === 0) return;
+        
+        activeUploadsCount++;
+        const previewContainer = document.getElementById(`slot-thumbs-preview-${index}`);
+        
+        // Show uploading loader
+        previewContainer.innerHTML = `
+            <div class="flex items-center gap-2 text-xs text-primary font-medium w-full justify-center py-4">
+                <i class="ti ti-loader animate-spin text-base"></i>
+                <span>Mengupload ${files.length} gambar...</span>
+            </div>
+        `;
+        
+        const formData = new FormData();
+        for (let i = 0; i < files.length; i++) {
+            formData.append('thumbnails', files[i]);
+        }
+        
+        try {
+            const url = '/api/autolive/upload-thumbnails';
+            const xhr = new XMLHttpRequest();
+            xhr.open('POST', url);
+            xhr.setRequestHeader('x-csrf-token', document.querySelector('input[name="_csrf"]').value);
+            
+            const response = await new Promise((resolve, reject) => {
+                xhr.onload = () => {
+                    if (xhr.status >= 200 && xhr.status < 300) {
+                        try {
+                            resolve(JSON.parse(xhr.responseText));
+                        } catch (e) { reject(e); }
+                    } else {
+                        reject(new Error('Gagal upload thumbnail'));
+                    }
+                };
+                xhr.onerror = () => reject(new Error('Koneksi terputus'));
+                xhr.send(formData);
+            });
+            
+            if (response.success) {
+                if (!currentSlots[index].thumbnails) {
+                    currentSlots[index].thumbnails = [];
+                }
+                if (!currentSlots[index].original_thumbnails) {
+                    currentSlots[index].original_thumbnails = [];
+                }
+                
+                response.thumbnails.forEach(t => {
+                    currentSlots[index].thumbnails.push(t.path);
+                    currentSlots[index].original_thumbnails.push(t.filename);
+                });
+            } else {
+                showAlert(`Gagal upload: ${response.error}`, 'error');
+            }
+        } catch (error) {
+            console.error('Slot upload error:', error);
+            showAlert(error.message || 'Gagal mengupload file', 'error');
+        } finally {
+            activeUploadsCount = Math.max(0, activeUploadsCount - 1);
+            renderSlots();
+        }
+    }
+
+    function removeExistingSlotThumb(slotIndex, thumbIndex) {
+        currentSlots[slotIndex].thumbnails.splice(thumbIndex, 1);
+        if (currentSlots[slotIndex].original_thumbnails) {
+            currentSlots[slotIndex].original_thumbnails.splice(thumbIndex, 1);
+        }
+        renderSlots();
+    }
+
+    function renderSlotThumbsPreview(slotIndex) {
+        const slot = currentSlots[slotIndex];
+        let html = '';
+        
+        if (slot.thumbnails && slot.thumbnails.length > 0) {
+            slot.thumbnails.forEach((t, i) => {
+                html += `
+                    <div class="relative w-16 h-16 rounded-lg border border-gray-700 overflow-hidden group">
+                        <img src="${t}" class="w-full h-full object-cover">
+                        <button type="button" onclick="removeExistingSlotThumb(${slotIndex}, ${i})" class="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-red-400">
+                            <i class="ti ti-trash text-sm"></i>
+                        </button>
+                    </div>
+                `;
+            });
+        }
+        
+        if (!html) {
+            html = `<span class="text-[10px] text-gray-500 italic w-full text-center py-1">Belum ada thumbnail</span>`;
+        }
+        
+        return html;
+    }
+
+    function addNewSlot() {
+        currentSlots.push({
+            id: "",
+            video_id: "",
+            internal_playlist_id: "",
+            titles: [],
+            description: "",
+            tags: "",
+            thumbnails: [],
+            original_thumbnails: [],
+            newFiles: []
+        });
+        renderSlots();
+    }
+
+    function removeSlot(index) {
+        if (currentSlots.length <= 1) {
+            showAlert("Minimal harus ada 1 slot video master", "warning");
+            return;
+        }
+        showConfirm("Apakah Anda yakin ingin menghapus slot ini?", () => {
+            currentSlots.splice(index, 1);
+            renderSlots();
+        }, "Ya, Hapus Slot");
+    }
+
+    function generateSlotSEO(index, silent = false) {
+        const slot = currentSlots[index];
+        if (!slot.titles || slot.titles.length === 0) {
+            if (!silent) showAlert("Mohon masukkan judul terlebih dahulu!", "warning");
+            return;
+        }
+
+        // Shuffle the slot's thumbnails & original thumbnails in-place to randomize the rotation pairing only if not silent (triggered by user button click)
+        if (!silent && slot.thumbnails && slot.thumbnails.length > 1) {
+            for (let i = slot.thumbnails.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [slot.thumbnails[i], slot.thumbnails[j]] = [slot.thumbnails[j], slot.thumbnails[i]];
+                if (slot.original_thumbnails && slot.original_thumbnails[i] && slot.original_thumbnails[j]) {
+                    [slot.original_thumbnails[i], slot.original_thumbnails[j]] = [slot.original_thumbnails[j], slot.original_thumbnails[i]];
+                }
+            }
+            // Trigger slots rendering so the new order of thumbnails shows up immediately in the slot editor area too!
+            renderSlots();
+            return;
+        }
+        
+        const previewContainer = document.getElementById(`slot-seo-preview-${index}`);
+        if (!previewContainer) return;
+        previewContainer.innerHTML = '';
+        previewContainer.classList.remove('hidden');
+        
+        const titleHeader = document.createElement('div');
+        titleHeader.className = 'text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-2 flex items-center gap-1.5';
+        titleHeader.innerHTML = `<i class="ti ti-eye"></i> Hasil Rotasi Metadata (Pasangan Judul & Thumbnail)`;
+        previewContainer.appendChild(titleHeader);
+        
+        const wrapper = document.createElement('div');
+        wrapper.className = 'grid grid-cols-1 md:grid-cols-2 gap-2 max-h-[220px] overflow-y-auto pr-1 custom-scrollbar';
+        
+        slot.titles.forEach((title, idx) => {
+            let thumbUrl = '/images/default-video-thumbnail.svg';
+            const totalCount = slot.thumbnails ? slot.thumbnails.length : 0;
+            if (totalCount > 0) {
+                thumbUrl = slot.thumbnails[idx % totalCount];
+            }
+            
+            const row = document.createElement('div');
+            row.className = 'flex items-center gap-3 bg-dark-800/80 p-2.5 rounded-xl border border-gray-700/50';
+            row.innerHTML = `
+                <div class="w-16 h-10 bg-dark-900 rounded overflow-hidden flex-shrink-0 border border-gray-750">
+                    <img src="${thumbUrl}" class="w-full h-full object-cover">
+                </div>
+                <div class="min-w-0 flex-1">
+                    <div class="text-[10px] text-gray-500 uppercase font-bold tracking-wider">Live #${idx + 1}</div>
+                    <div class="text-xs font-semibold text-white truncate" title="${title}">${title}</div>
+                </div>
+            `;
+            wrapper.appendChild(row);
+        });
+        
+        previewContainer.appendChild(wrapper);
+        if (!silent) showAlert("Rotasi metadata berhasil diacak kembali!", "success");
+    }
+
+    function closeModal() {
+        document.getElementById('autoliveModal').classList.add('hidden');
+        document.getElementById('autoliveModal').classList.remove('flex');
+    }
+
+    async function handleThumbnailPreview(input) {
+        const count = input.files.length;
+        const totalSize = Array.from(input.files).reduce((sum, file) => sum + file.size, 0);
+        const totalMb = totalSize / (1024 * 1024);
+        const thumbCountEl = document.getElementById('thumbCount');
+        
+        if (count === 0) {
+            thumbCountEl.innerText = 'Belum ada file dipilih';
+            return;
+        }
+        
+        thumbCountEl.innerHTML = `<i class="ti ti-loader animate-spin"></i> Mengupload ${count} file...`;
+        
+        const formData = new FormData();
+        for (let i = 0; i < input.files.length; i++) {
+            formData.append('thumbnails', input.files[i]);
+        }
+        
+        try {
+            const url = '/api/autolive/upload-thumbnails';
+            const method = 'POST';
+            
+            const result = await submitAutoliveForm(url, method, formData, (percent) => {
+                thumbCountEl.innerHTML = `<i class="ti ti-loader animate-spin"></i> Mengupload ${percent}%`;
+            });
+            
+            if (result.success) {
+                uploadedThumbnailPaths = result.thumbnails;
+                thumbCountEl.innerHTML = `<span class="text-green-400"><i class="ti ti-check"></i> ${count} file terupload - ${totalMb.toFixed(totalMb >= 10 ? 0 : 1)} MB</span>`;
+            } else {
+                thumbCountEl.innerHTML = `<span class="text-red-400"><i class="ti ti-x"></i> Gagal upload: ${result.error}</span>`;
+            }
+        } catch (error) {
+            console.error('Upload error:', error);
+            thumbCountEl.innerHTML = `<span class="text-red-400"><i class="ti ti-x"></i> ${error.message || 'Gagal upload'}</span>`;
+        }
+    }
+
+    function setAutoliveSaving(isSaving, message = 'Menyiapkan upload...', percent = 0) {
+        const btn = document.getElementById('saveBtn');
+        const status = document.getElementById('autoliveUploadStatus');
+        const text = document.getElementById('autoliveUploadText');
+        const percentText = document.getElementById('autoliveUploadPercent');
+        const bar = document.getElementById('autoliveUploadBar');
+        const safePercent = Math.max(0, Math.min(100, Math.round(percent)));
+
+        btn.disabled = isSaving;
+        btn.innerHTML = isSaving
+            ? '<i class="ti ti-loader animate-spin"></i><span>Menyimpan...</span>'
+            : '<i class="ti ti-device-floppy"></i><span>Simpan Autolive</span>';
+
+        status.classList.toggle('hidden', !isSaving);
+        text.innerText = message;
+        percentText.innerText = `${safePercent}%`;
+        bar.style.width = `${safePercent}%`;
+    }
+
+    function submitAutoliveForm(url, method, formData, onProgress) {
+        return new Promise((resolve, reject) => {
+            const xhr = new XMLHttpRequest();
+            xhr.open(method, url);
+            xhr.setRequestHeader('x-csrf-token', document.querySelector('input[name="_csrf"]').value);
+            xhr.upload.onprogress = (event) => {
+                if (event.lengthComputable) {
+                    onProgress(Math.round((event.loaded / event.total) * 100));
+                }
+            };
+            xhr.onload = () => {
+                let result = {};
+                try {
+                    result = JSON.parse(xhr.responseText || '{}');
+                } catch (error) {
+                    return reject(new Error('Respons server tidak valid'));
+                }
+
+                if (xhr.status >= 200 && xhr.status < 300) {
+                    resolve(result);
+                } else {
+                    reject(new Error(result.error || `HTTP ${xhr.status}`));
+                }
+            };
+            xhr.onerror = () => reject(new Error('Upload gagal terkirim'));
+            xhr.send(formData);
+        });
+    }
+
+    function escapeHtml(value) {
+        return String(value || '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+    }
+
+    function parseTags(value) {
+        return String(value || '')
+            .split(',')
+            .map(tag => tag.trim())
+            .filter(Boolean);
+    }
+
+    function syncSharedTagsInput() {
+        document.getElementById('bulkTags').value = sharedTags.join(', ');
+    }
+
+    function setSharedTags(value) {
+        sharedTags = [];
+        parseTags(value).forEach(addSharedTag);
+        document.getElementById('bulkTagsInput').value = '';
+        renderTagChips();
+        syncSharedTagsInput();
+    }
+
+    function addSharedTag(tag) {
+        const normalized = String(tag || '').trim();
+        if (!normalized) return;
+        const exists = sharedTags.some(existing => existing.toLowerCase() === normalized.toLowerCase());
+        if (!exists) sharedTags.push(normalized);
+    }
+
+    function removeSharedTag(index) {
+        sharedTags.splice(index, 1);
+        renderTagChips();
+        syncSharedTagsInput();
+    }
+
+    function renderTagChips() {
+        const container = document.getElementById('tagChips');
+        container.innerHTML = sharedTags.map((tag, index) => `
+            <span class="inline-flex items-center gap-1 bg-primary/15 text-primary border border-primary/30 rounded-lg px-2 py-1 text-xs font-medium">
+                ${escapeHtml(tag)}
+                <button type="button" onclick="removeSharedTag(${index})" class="hover:text-white transition-colors">
+                    <i class="ti ti-x text-[11px]"></i>
+                </button>
+            </span>
+        `).join('');
+    }
+
+    function addTagFromInput() {
+        const input = document.getElementById('bulkTagsInput');
+        parseTags(input.value).forEach(addSharedTag);
+        input.value = '';
+        renderTagChips();
+        syncSharedTagsInput();
+    }
+
+    function handleTagInputKeydown(event) {
+        if (event.key === 'Enter' || event.key === ',') {
+            event.preventDefault();
+            addTagFromInput();
+        } else if (event.key === 'Backspace' && !event.target.value && sharedTags.length > 0) {
+            sharedTags.pop();
+            renderTagChips();
+            syncSharedTagsInput();
+        }
+    }
+
+    function handleTagInput(event) {
+        if (event.target.value.includes(',')) {
+            addTagFromInput();
+        }
+    }
+
+    function getSharedTagsString() {
+        addTagFromInput();
+        return sharedTags.join(', ');
+    }
+
+    function generateItemsFromBulk() {
+        const titlesText = document.getElementById('bulkTitles').value.trim();
+        if (!titlesText) {
+            showAlert('Masukkan daftar judul terlebih dahulu', 'warning');
+            return;
+        }
+
+        const titles = titlesText.split('\n').map(t => t.trim()).filter(t => t);
+        const sharedDescription = document.getElementById('bulkDescriptions').value.trim();
+        const sharedTagsValue = getSharedTagsString();
+        const previousItems = currentItems.slice();
+        const hasExistingItems = previousItems.length > 0;
+        
+        currentItems = titles.map((title, index) => {
+            const previousItem = previousItems[index] || {};
+            const newItemOffset = index - previousItems.length;
+            const shouldUseUploadedThumbnail = uploadedThumbnailPaths.length > 0 && (
+                !hasExistingItems ||
+                newItemOffset >= 0 ||
+                !previousItem.thumbnail_path ||
+                uploadedThumbnailPaths.length >= titles.length
+            );
+            
+            const newThumbnailData = shouldUseUploadedThumbnail
+                ? uploadedThumbnailPaths[(newItemOffset >= 0 ? newItemOffset : index) % uploadedThumbnailPaths.length]
+                : null;
+
+            return {
+                title: title,
+                description: sharedDescription,
+                tags: sharedTagsValue,
+                thumbnail_path: newThumbnailData ? newThumbnailData.path : (previousItem.thumbnail_path || null),
+                original_thumbnail_path: newThumbnailData ? newThumbnailData.originalName : (previousItem.original_thumbnail_path || null),
+                thumbnail_file: null,
+                thumbnail_upload_index: -1
+            };
+        });
+
+        renderItemsPreview();
+    }
+
+    function renderItemsPreview() {
+        const container = document.getElementById('itemsPreview');
+        container.innerHTML = '';
+
+        if (currentItems.length === 0) return;
+
+        currentItems.forEach((item, index) => {
+            const div = document.createElement('div');
+            div.className = 'grid grid-cols-[2rem_1fr_auto] gap-4 bg-dark-900/50 p-4 rounded-xl border border-gray-700/50 relative group';
+            
+            let thumbnailInfo = '<i class="ti ti-photo-off mr-1"></i>No Thumbnail';
+            
+            if (item.thumbnail_path) {
+                const displayName = escapeHtml(item.original_thumbnail_path || 'Thumbnail tersimpan');
+                thumbnailInfo = `<button type="button" onclick="openImagePreview('${escapeHtml(item.thumbnail_path)}')" class="text-primary hover:text-blue-400 transition-colors flex items-center gap-1">
+                                    <i class="ti ti-photo mr-1"></i>${displayName}
+                                 </button>`;
+            }
+
+            div.innerHTML = `
+                <div class="w-8 h-8 rounded-full bg-gray-700 flex items-center justify-center text-xs font-bold text-gray-400 mt-1">
+                    ${index + 1}
+                </div>
+                <div class="min-w-0 space-y-3">
+                    <div>
+                        <label class="block text-[10px] uppercase tracking-wider text-gray-500 mb-1">Judul</label>
+                        <input type="text" value="${escapeHtml(item.title)}" oninput="updateItemField(${index}, 'title', this.value)" class="w-full bg-dark-900 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm focus:ring-1 focus:ring-primary focus:border-primary transition-all">
+                    </div>
+                    <div class="text-[10px] text-gray-500 relative">
+                        ${thumbnailInfo}
+                    </div>
+                </div>
+                <button type="button" onclick="removeItem(${index})" class="p-2 text-gray-500 hover:text-red-500 transition-colors self-start">
+                    <i class="ti ti-trash"></i>
+                </button>
+            `;
+            container.appendChild(div);
+        });
+    }
+
+    function updateItemField(index, field, value) {
+        if (!currentItems[index]) return;
+        currentItems[index][field] = value;
+    }
+
+    function openImagePreview(src) {
+        document.getElementById('previewModalImage').src = src;
+        document.getElementById('imagePreviewModal').classList.remove('hidden');
+    }
+
+    function closeImagePreview() {
+        document.getElementById('imagePreviewModal').classList.add('hidden');
+        setTimeout(() => {
+            document.getElementById('previewModalImage').src = '';
+        }, 300);
+    }
+
+    function openSchedulePreview(src, title, time) {
+        const modal = document.getElementById('schedulePreviewModal');
+        const content = document.getElementById('schedulePreviewContent');
+        const img = document.getElementById('schedulePreviewImage');
+        const titleEl = document.getElementById('schedulePreviewTitle');
+        const timeEl = document.getElementById('schedulePreviewTime').querySelector('span');
+
+        img.src = src || '/images/default-thumbnail.jpg';
+        titleEl.innerText = title;
+        timeEl.innerText = time;
+
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
+        
+        // Trigger animation
+        setTimeout(() => {
+            content.classList.remove('scale-95', 'opacity-0');
+            content.classList.add('scale-100', 'opacity-100');
+        }, 10);
+    }
+
+    function closeSchedulePreview() {
+        const modal = document.getElementById('schedulePreviewModal');
+        const content = document.getElementById('schedulePreviewContent');
+
+        content.classList.remove('scale-100', 'opacity-100');
+        content.classList.add('scale-95', 'opacity-0');
+
+        setTimeout(() => {
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+            document.getElementById('schedulePreviewImage').src = '';
+        }, 300);
+    }
+
+    function removeItem(index) {
+        currentItems.splice(index, 1);
+        renderItemsPreview();
+    }
+
+    async function saveSeries() {
+        if (activeUploadsCount > 0) {
+            showAlert('Mohon tunggu sebentar, proses upload gambar masih berjalan...', 'warning');
+            return;
+        }
+        const id = document.getElementById('seriesId').value;
+        const name = document.getElementById('seriesName').value;
+        const startTime = document.getElementById('startTime').value;
+        const repeatMode = document.getElementById('repeatMode').value;
+        const channelId = document.getElementById('channelId').value;
+        const dailyTimes = document.getElementById('dailyTimes').value;
+        
+        const hours = parseInt(document.getElementById('durationHours').value) || 0;
+        const mins = parseInt(document.getElementById('durationMinutes').value) || 0;
+        const duration = (hours * 60) + mins;
+
+        // YouTube Settings
+        const privacy = document.getElementById('privacy').value;
+        const categoryId = document.getElementById('categoryId').value;
+        const monetizationEnabled = document.getElementById('monetizationEnabled').checked ? 1 : 0;
+        const madeForKids = document.getElementById('madeForKids').checked ? 1 : 0;
+        const playlistId = document.getElementById('playlistId').value;
+
+        if (!name || !startTime) {
+            showAlert('Mohon isi semua field wajib (Nama, Waktu Mulai)', 'warning');
+            return;
+        }
+
+        if (duration <= 0) {
+            showAlert('Durasi live tidak boleh kosong', 'warning');
+            return;
+        }
+
+        if (currentSlots.length === 0) {
+            showAlert('Mohon tambahkan setidaknya satu slot video master', 'warning');
+            return;
+        }
+
+        for (let i = 0; i < currentSlots.length; i++) {
+            const slot = currentSlots[i];
+            if (!slot.video_id && !slot.internal_playlist_id) {
+                showAlert(`Mohon pilih Video atau Playlist untuk Slot #${i + 1}`, 'warning');
+                return;
+            }
+            if (!slot.titles || slot.titles.length === 0) {
+                showAlert(`Mohon masukkan setidaknya satu Judul untuk Slot #${i + 1}`, 'warning');
+                return;
+            }
+        }
+
+        const isRandomVideo = currentSlots.length > 1 ? 1 : 0;
+
+        const formData = new FormData();
+        formData.append('name', name);
+        // Fallbacks for the base series fields - we use the first slot as default
+        formData.append('video_id', currentSlots[0].video_id || '');
+        formData.append('internal_playlist_id', currentSlots[0].internal_playlist_id || '');
+        
+        const startTimeISO = startTime ? new Date(startTime).toISOString() : '';
+        formData.append('start_time', startTimeISO);
+        formData.append('repeat_mode', repeatMode);
+        formData.append('timezone', Intl.DateTimeFormat().resolvedOptions().timeZone || 'Asia/Bangkok');
+        formData.append('duration', duration);
+        formData.append('youtube_channel_id', channelId);
+        formData.append('custom_dates', JSON.stringify(selectedDates));
+        formData.append('is_random_video', isRandomVideo);
+        formData.append('daily_times', dailyTimes);
+        
+        formData.append('privacy', privacy);
+        formData.append('category_id', categoryId);
+        formData.append('monetization_enabled', monetizationEnabled);
+        formData.append('made_for_kids', madeForKids);
+        formData.append('playlist_id', playlistId);
+
+        const itemsToSend = [];
+        currentSlots.forEach((slot, idx) => {
+            itemsToSend.push({
+                video_id: slot.video_id || null,
+                internal_playlist_id: slot.internal_playlist_id || null,
+                titles: slot.titles || [],
+                description: slot.description || '',
+                tags: slot.tags || '',
+                existing_thumbnails: slot.thumbnails || [],
+                existing_original_thumbnails: slot.original_thumbnails || [],
+                new_thumbnails_count: 0
+            });
+        });
+
+        formData.append('items', JSON.stringify(itemsToSend));
+
+        setAutoliveSaving(true, 'Mengupload thumbnail dan metadata...', 0);
+
+        try {
+            const url = id ? `/api/autolive/${id}` : '/api/autolive';
+            const method = id ? 'PUT' : 'POST';
+
+            const result = await submitAutoliveForm(url, method, formData, (percent) => {
+                setAutoliveSaving(true, 'Mengupload thumbnail dan metadata...', percent);
+            });
+            if (result.success) {
+                setAutoliveSaving(true, 'Selesai, memuat ulang...', 100);
+                location.reload();
+            } else {
+                showAlert('Gagal menyimpan: ' + result.error, 'error');
+                setAutoliveSaving(false);
+            }
+        } catch (error) {
+            console.error('Save error:', error);
+            showAlert(error.message || 'Terjadi kesalahan sistem', 'error');
+            setAutoliveSaving(false);
+        }
+    }
+
+    async function toggleSeries(id) {
+        try {
+            const response = await fetch(`/api/autolive/${id}/toggle`, {
+                method: 'POST',
+                headers: { 'x-csrf-token': document.querySelector('input[name="_csrf"]').value }
+            });
+            const result = await response.json();
+            if (!result.success) {
+                showAlert('Gagal mengubah status', 'error');
+                // Revert checkbox state if failed
+                const checkbox = document.querySelector(`input[onchange="toggleSeries('${id}')"]`);
+                if (checkbox) checkbox.checked = !checkbox.checked;
+            } else {
+                const badge = document.getElementById(`status-badge-${id}`);
+                if (badge) {
+                    if (result.is_active) {
+                        badge.className = 'text-blue-400 text-xs font-bold uppercase tracking-wider';
+                        badge.innerText = 'SCHEDULED';
+                    } else {
+                        badge.className = 'text-gray-500 text-xs font-bold uppercase tracking-wider';
+                        badge.innerText = 'INACTIVE';
+                    }
+                }
+            }
+        } catch (e) {
+            showAlert('Terjadi kesalahan', 'error');
+            const checkbox = document.querySelector(`input[onchange="toggleSeries('${id}')"]`);
+            if (checkbox) checkbox.checked = !checkbox.checked;
+        }
+    }
+
+    async function deleteSeries(id) {
+        showConfirm('Yakin ingin menghapus seri Autolive ini? Semua metadata di dalamnya juga akan terhapus.', async () => {
+
+        try {
+            const response = await fetch(`/api/autolive/${id}`, {
+                method: 'DELETE',
+                headers: { 'x-csrf-token': document.querySelector('input[name="_csrf"]').value }
+            });
+            const result = await response.json();
+            if (result.success) {
+                location.reload();
+            } else {
+                showAlert('Gagal menghapus', 'error');
+            }
+        } catch (e) {
+            showAlert('Gagal menghapus', 'error');
+        }
+        }, 'Ya, Hapus');
+    }
+
+    async function editSeries(id) {
+        try {
+            const response = await fetch(`/api/autolive/${id}`);
+            const result = await response.json();
+            if (!result.success) return showAlert('Gagal mengambil data', 'error');
+
+            const s = result.series;
+            document.getElementById('seriesId').value = s.id;
+            document.getElementById('seriesName').value = s.name;
+
+            document.getElementById('channelId').value = s.youtube_channel_id;
+            
+            // Format date for datetime-local
+            if (s.start_time) {
+                const d = new Date(s.start_time);
+                const offset = d.getTimezoneOffset() * 60000;
+                const localISOTime = (new Date(d - offset)).toISOString().slice(0, 16);
+                document.getElementById('startTime').value = localISOTime;
+            }
+            
+            document.getElementById('repeatMode').value = s.repeat_mode;
+            
+            // Set daily times value
+            document.getElementById('dailyTimes').value = s.daily_times || '';
+            if (s.repeat_mode === 'daily') {
+                document.getElementById('dailyTimesContainer').classList.remove('hidden');
+            } else {
+                document.getElementById('dailyTimesContainer').classList.add('hidden');
+            }
+            
+            if (s.repeat_mode === 'custom') {
+                document.getElementById('customDatesContainer').classList.remove('hidden');
+                selectedDates = JSON.parse(s.custom_dates || '[]');
+                renderCustomDates();
+            } else {
+                document.getElementById('customDatesContainer').classList.add('hidden');
+                selectedDates = [];
+                document.getElementById('customDatesList').innerHTML = '';
+            }
+
+            document.getElementById('durationHours').value = Math.floor(s.duration / 60);
+            document.getElementById('durationMinutes').value = s.duration % 60;
+            
+            // Set YouTube settings
+            document.getElementById('privacy').value = s.privacy || 'public';
+            document.getElementById('categoryId').value = s.category_id || '24';
+            document.getElementById('monetizationEnabled').checked = s.monetization_enabled === 1;
+            document.getElementById('madeForKids').checked = s.made_for_kids === 1;
+            
+            // Load playlists and select the correct one
+            await loadPlaylists(s.youtube_channel_id, s.playlist_id);
+
+            currentSlots = (s.items || []).map(item => ({
+                id: item.id,
+                video_id: item.video_id || "",
+                internal_playlist_id: item.internal_playlist_id || "",
+                titles: item.titles || [],
+                description: item.description || "",
+                tags: item.tags || "",
+                thumbnails: item.thumbnails || [],
+                original_thumbnails: item.original_thumbnails || [],
+                newFiles: []
+            }));
+
+            if (currentSlots.length === 0) {
+                addNewSlot();
+            } else {
+                renderSlots();
+            }
+            
+            document.getElementById('modalTitle').innerHTML = '<i class="ti ti-bolt text-primary"></i><span>Edit Seri Autolive</span>';
+            document.getElementById('autoliveModal').classList.remove('hidden');
+            document.getElementById('autoliveModal').classList.add('flex');
+        } catch (e) {
+            showAlert('Kesalahan saat memuat data', 'error');
+        }
+    }
+
+    // ============================================================
+    // Autolive Custom Video/Playlist Selector
+    // ============================================================
+    const autoliveAllItems = [
+      <% playlists.forEach(p => { %>
+        { 
+          type: 'playlist', 
+          id: <%- JSON.stringify(p.id) %>, 
+          label: <%- JSON.stringify(p.name) %>, 
+          sub: <%- JSON.stringify((p.video_count || 0) + ' videos • ' + (p.audio_count || 0) + ' audio') %>
+        },
+      <% }) %>
+      <% videos.forEach(v => { %>
+        { 
+          type: 'video', 
+          id: <%- JSON.stringify(v.id) %>, 
+          label: <%- JSON.stringify(v.title) %>, 
+          sub: '' 
+        },
+      <% }) %>
+    ];
+</script>
