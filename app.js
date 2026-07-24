@@ -5336,13 +5336,19 @@ const server = app.listen(port, '0.0.0.0', async () => {
   try {
     const streams = await Stream.findAll(null, 'live');
     if (streams && streams.length > 0) {
-      console.log(`Resetting ${streams.length} live streams to offline state...`);
+      console.log(`AutoStream: Resuming ${streams.length} live streams on startup...`);
       for (const stream of streams) {
-        await Stream.updateStatus(stream.id, 'offline');
+        streamingService.startStream(stream.id, false).catch(err => {
+          console.error(`Failed to resume stream ${stream.id} on startup:`, err);
+          Stream.updateStatus(stream.id, 'offline', null, {
+            stopReason: 'start_failed',
+            stopMessage: err.message || 'Gagal memulai otomatis setelah restart'
+          }).catch(() => {});
+        });
       }
     }
   } catch (error) {
-    console.error('Error resetting stream statuses:', error);
+    console.error('Error resuming live streams on startup:', error);
   }
   schedulerService.init(streamingService);
   rotationService.init();
