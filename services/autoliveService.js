@@ -161,11 +161,41 @@ class AutoliveService {
       const targetEnd = session.endTime;
       const ts = targetStart.getTime();
       const streamId = `autolive_${series.id}_${ts}`;
-      const linkedStream = await Stream.findById(streamId);
+      let linkedStream = await Stream.findById(streamId);
 
       const timeToTarget = targetStart - now;
       const isPastSession = now >= targetEnd;
       const isCurrentlyActive = now >= targetStart && now < targetEnd;
+
+      // A. Create local stream record 30 minutes in advance so it appears on the dashboard
+      const LOCAL_PREPARE_WINDOW = 30 * 60 * 1000; // 30 minutes
+      if (!linkedStream && !isPastSession && timeToTarget <= LOCAL_PREPARE_WINDOW) {
+        try {
+          const { item: chosenSlot } = this.getItemForGlobalIndex(series, items, session.globalIndex);
+          const chosenVideoId = chosenSlot.internal_playlist_id || chosenSlot.video_id || series.internal_playlist_id || series.video_id;
+          const titles = chosenSlot.titles || [];
+          const itemTitle = titles[session.globalIndex % (titles.length || 1)] || series.name;
+          const thumbnails = chosenSlot.thumbnails || [];
+          const itemThumbnail = thumbnails[session.globalIndex % (thumbnails.length || 1)] || '';
+          
+          console.log(`[Autolive] Creating local stream record for session ${targetStart.toISOString()} of "${series.name}" (30 mins before live)`);
+          
+          await this.getOrCreateStreamRecord(series, {
+            title: itemTitle,
+            schedule_time: targetStart.toISOString(),
+            end_time: targetEnd.toISOString(),
+            duration: series.duration || null,
+            video_id: chosenVideoId
+          });
+          
+          linkedStream = await Stream.findById(streamId);
+          if (itemThumbnail) {
+            await Stream.update(streamId, { youtube_thumbnail: itemThumbnail });
+          }
+        } catch (localCreateErr) {
+          console.error('[Autolive] Failed to create local stream record:', localCreateErr);
+        }
+      }
 
       // 1. If this session is currently active and the stream is not live yet, check/trigger scheduler to start it
       if (isCurrentlyActive && (!linkedStream || linkedStream.status === 'scheduled')) {
@@ -184,7 +214,7 @@ class AutoliveService {
         await this.stopAutoliveStream(series, targetStart);
       }
 
-      // 3. Prepare future sessions 3 hours before start (skip if already offline or done)
+      // 3. Prepare future sessions (calling YouTube API)
       const isFailedOrFinished = linkedStream && (linkedStream.status === 'offline' || linkedStream.status === 'done');
       const shouldPrepare = !isPastSession && !isFailedOrFinished && (timeToTarget <= PREPARE_WINDOW_MS || series.repeat_mode === 'nonstop');
       if (shouldPrepare) {
@@ -192,7 +222,7 @@ class AutoliveService {
         const shouldSync = !linkedStream || (now.getTime() - lastSync > 30 * 60 * 1000) || timeToTarget < 5 * 60 * 1000;
         
         if (shouldSync) {
-          console.log(`[Autolive] Preparing session ${targetStart.toISOString()} for "${series.name}"...`);
+          console.log(`[Autolive] Preparing YouTube broadcast for session ${targetStart.toISOString()} of "${series.name}"...`);
           await this.syncToYouTube(series, targetStart, targetEnd);
           
           await Autolive.update(series.id, {
