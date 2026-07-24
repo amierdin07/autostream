@@ -477,43 +477,7 @@
               </div>
             </div>
 
-            <div class="pt-8 border-t border-gray-700">
-              <h3 class="text-lg font-semibold mb-2">Telegram Notifications</h3>
-              <p class="text-gray-400 text-sm mb-6">Dapatkan notifikasi real-time saat sinyal stream memburuk.</p>
-              
-              <form id="telegram-settings-form" class="space-y-6">
-                <div class="space-y-4">
-                  <div class="space-y-2">
-                    <label for="telegram-bot-token" class="block text-sm font-medium text-gray-300">
-                      <i class="ti ti-brand-telegram mr-1"></i>Bot Token
-                    </label>
-                    <input type="text" id="telegram-bot-token" name="telegramBotToken"
-                      class="bg-dark-900 text-white px-4 py-2 rounded-lg block w-full focus:outline-none focus:ring-1 focus:ring-primary border border-gray-700 font-mono text-sm"
-                      placeholder="Enter your Bot Token from @BotFather"
-                      value="<%= user.telegram_bot_token || '' %>">
-                  </div>
-                  
-                  <div class="space-y-2">
-                    <label for="telegram-chat-id" class="block text-sm font-medium text-gray-300">
-                      <i class="ti ti-message mr-1"></i>Chat ID
-                    </label>
-                    <input type="text" id="telegram-chat-id" name="telegramChatId"
-                      class="bg-dark-900 text-white px-4 py-2 rounded-lg block w-full focus:outline-none focus:ring-1 focus:ring-primary border border-gray-700 font-mono text-sm"
-                      placeholder="Enter your Telegram Chat ID (e.g. 123456789)"
-                      value="<%= user.telegram_chat_id || '' %>">
-                    <p class="text-xs text-gray-500">Gunakan <a href="https://t.me/userinfobot" target="_blank" class="text-blue-400 hover:underline">@userinfobot</a> untuk mendapatkan Chat ID Anda.</p>
-                  </div>
-                </div>
-                
-                <div class="pt-2">
-                  <button type="submit" id="save-telegram-settings"
-                    class="px-4 py-2 bg-primary hover:bg-blue-600 text-white rounded-lg transition-colors flex items-center gap-2">
-                    <i class="ti ti-device-floppy"></i>
-                    <span>Save Telegram Settings</span>
-                  </button>
-                </div>
-              </form>
-            </div>
+
           </div>
         </div>
       </div>
@@ -1214,48 +1178,7 @@
         });
       }
 
-      const telegramSettingsForm = document.getElementById('telegram-settings-form');
-      if (telegramSettingsForm) {
-        telegramSettingsForm.addEventListener('submit', async (e) => {
-          e.preventDefault();
-          const saveBtn = document.getElementById('save-telegram-settings');
-          const originalBtnContent = saveBtn.innerHTML;
-          
-          const telegramBotToken = document.getElementById('telegram-bot-token').value.trim();
-          const telegramChatId = document.getElementById('telegram-chat-id').value.trim();
-          
-          if (!telegramBotToken || !telegramChatId) {
-            showToast('error', 'Bot Token and Chat ID are required');
-            return;
-          }
-          
-          saveBtn.disabled = true;
-          saveBtn.innerHTML = '<i class="ti ti-loader animate-spin mr-2"></i>Saving...';
-          
-          try {
-            const response = await fetch('/api/settings/telegram', {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'X-CSRF-Token': '<%= csrfToken %>'
-              },
-              body: JSON.stringify({ telegramBotToken, telegramChatId })
-            });
-            
-            const data = await response.json();
-            if (data.success) {
-              showToast('success', 'Telegram settings saved successfully');
-            } else {
-              showToast('error', data.error || 'Failed to save settings');
-            }
-          } catch (err) {
-            showToast('error', 'An error occurred');
-          } finally {
-            saveBtn.disabled = false;
-            saveBtn.innerHTML = originalBtnContent;
-          }
-        });
-      }
+
   });
 
   async function setDefaultChannel(channelId) {
