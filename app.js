@@ -3955,6 +3955,56 @@ app.put('/api/streams/:id', isAuthenticated, uploadThumbnail.single('thumbnail')
     res.status(500).json({ success: false, error: 'Failed to update stream' });
   }
 });
+app.delete('/api/streams/batch', isAuthenticated, async (req, res) => {
+  try {
+    const ids = Array.isArray(req.body?.ids) ? req.body.ids.filter(Boolean) : [];
+    const uniqueIds = [...new Set(ids)];
+
+    if (uniqueIds.length === 0) {
+      return res.status(400).json({ success: false, error: 'No streams selected' });
+    }
+
+    const result = {
+      deleted: 0,
+      skipped: 0,
+      notFound: 0,
+      unauthorized: 0,
+      skippedLive: 0
+    };
+
+    for (const streamId of uniqueIds) {
+      const stream = await Stream.findById(streamId);
+      if (!stream) {
+        result.notFound++;
+        continue;
+      }
+
+      if (stream.user_id !== req.session.userId) {
+        result.unauthorized++;
+        continue;
+      }
+
+      if (stream.status === 'live') {
+        result.skipped++;
+        result.skippedLive++;
+        continue;
+      }
+
+      await Stream.delete(streamId, req.session.userId);
+      result.deleted++;
+    }
+
+    res.json({
+      success: true,
+      ...result,
+      message: `Deleted ${result.deleted} stream(s)`
+    });
+  } catch (error) {
+    console.error('Error batch deleting streams:', error);
+    res.status(500).json({ success: false, error: 'Failed to delete selected streams' });
+  }
+});
+
 app.delete('/api/streams/:id', isAuthenticated, async (req, res) => {
   try {
     const stream = await Stream.findById(req.params.id);
