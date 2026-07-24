@@ -4,5 +4,10 @@ logs/
 
 # ignore real env from repo
 .env
-package-lock.json
-db/streamflow.db
+# Databases and SQLite files
+*.sqlite
+*.sqlite3
+*.db
+db/*.db
+db/*.sqlite
+db/*.sqlite3
