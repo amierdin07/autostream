@@ -1075,13 +1075,75 @@ class AutoliveService {
       const maxIndex = playlist.videos.length - 1;
       pool = pool.filter(idx => typeof idx === 'number' && idx >= 0 && idx <= maxIndex);
       
+      // Get recently played video IDs in the last 18 hours to prevent same-day repeats
+      const { db } = require('../db/database');
+      const eighteenHoursAgo = new Date(Date.now() - 18 * 60 * 60 * 1000).toISOString();
+      const recentlyPlayedIds = await new Promise((resolve) => {
+        db.all(
+          `SELECT DISTINCT video_id FROM stream_history 
+           WHERE stream_id LIKE ? AND start_time > ?`,
+          [`autolive_${series.id}%`, eighteenHoursAgo],
+          (err, rows) => {
+            if (err || !rows) {
+              resolve([]);
+            } else {
+              resolve(rows.map(r => r.video_id).filter(Boolean));
+            }
+          }
+        );
+      });
+
+      const playlistVideos = playlist.videos;
+      const getAvailableIndices = (candidates) => {
+        if (playlistVideos.length > recentlyPlayedIds.length) {
+          return candidates.filter(idx => !recentlyPlayedIds.includes(playlistVideos[idx].id));
+        }
+        return candidates;
+      };
+      
       if (pool.length === 0) {
-        const indices = Array.from({ length: playlist.videos.length }, (_, i) => i);
-        pool = shuffleArray(indices);
+        const allIndices = Array.from({ length: playlistVideos.length }, (_, i) => i);
+        let eligibleIndices = getAvailableIndices(allIndices);
+        
+        if (eligibleIndices.length === 0) {
+          eligibleIndices = allIndices;
+        }
+
+        pool = shuffleArray(eligibleIndices);
+        
+        // Put the skipped indices at the back of the pool
+        const skippedIndices = allIndices.filter(idx => !pool.includes(idx));
+        if (skippedIndices.length > 0) {
+          pool = pool.concat(shuffleArray(skippedIndices));
+        }
+
+        // Anti-consecutive: if first of new pool matches current video, swap it
+        if (pool.length > 1 && series.current_video_id) {
+          const lastVideoIndex = playlistVideos.findIndex(v => v.id === series.current_video_id);
+          if (pool[0] === lastVideoIndex) {
+            [pool[0], pool[1]] = [pool[1], pool[0]];
+          }
+        }
+      } else {
+        // Swap next item if it violates the 18-hour rule and we have other options in the remaining pool
+        if (playlistVideos.length > recentlyPlayedIds.length) {
+          if (recentlyPlayedIds.includes(playlistVideos[pool[0]].id)) {
+            let foundValidIndex = -1;
+            for (let i = 1; i < pool.length; i++) {
+              if (!recentlyPlayedIds.includes(playlistVideos[pool[i]].id)) {
+                foundValidIndex = i;
+                break;
+              }
+            }
+            if (foundValidIndex !== -1) {
+              [pool[0], pool[foundValidIndex]] = [pool[foundValidIndex], pool[0]];
+            }
+          }
+        }
       }
       
       const chosenIndex = pool.shift();
-      const videoId = playlist.videos[chosenIndex].id;
+      const videoId = playlistVideos[chosenIndex].id;
       
       const Autolive = require('../models/Autolive');
       await Autolive.update(series.id, {
