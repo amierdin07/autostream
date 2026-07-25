@@ -11,8 +11,19 @@ const originalConsoleError = console.error;
 const originalConsoleWarn = console.warn;
 const originalConsoleInfo = console.info;
 const originalConsoleDebug = console.debug;
+function getLocalTimestamp() {
+  const now = new Date();
+  const pad = num => String(num).padStart(2, '0');
+  return now.getFullYear() +
+    '-' + pad(now.getMonth() + 1) +
+    '-' + pad(now.getDate()) +
+    ' ' + pad(now.getHours()) +
+    ':' + pad(now.getMinutes()) +
+    ':' + pad(now.getSeconds());
+}
+
 function writeToLogFile(level, ...args) {
-  const timestamp = new Date().toISOString();
+  const timestamp = getLocalTimestamp();
   const message = args.map(arg => typeof arg === 'string' ? arg : util.inspect(arg, { depth: null, colors: false })).join(' ');
   const logEntry = `${timestamp} [${level.toUpperCase()}] ${message}\n`;
   try {
