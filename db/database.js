@@ -99,6 +99,9 @@ function createTables() {
         end_time TIMESTAMP,
         duration INTEGER,
         use_advanced_settings BOOLEAN DEFAULT 0,
+        status TEXT,
+        last_stop_reason TEXT,
+        last_stop_message TEXT,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         user_id TEXT,
         FOREIGN KEY (user_id) REFERENCES users(id),
@@ -136,6 +139,24 @@ function createTables() {
         FOREIGN KEY (playlist_id) REFERENCES playlists(id) ON DELETE CASCADE,
         FOREIGN KEY (audio_id) REFERENCES videos(id) ON DELETE CASCADE
       )`);
+
+      db.run(`ALTER TABLE stream_history ADD COLUMN status TEXT`, (err) => {
+        if (err && !err.message.includes('duplicate column name')) {
+          console.error('Error adding status column to stream_history:', err.message);
+        }
+      });
+
+      db.run(`ALTER TABLE stream_history ADD COLUMN last_stop_reason TEXT`, (err) => {
+        if (err && !err.message.includes('duplicate column name')) {
+          console.error('Error adding last_stop_reason column to stream_history:', err.message);
+        }
+      });
+
+      db.run(`ALTER TABLE stream_history ADD COLUMN last_stop_message TEXT`, (err) => {
+        if (err && !err.message.includes('duplicate column name')) {
+          console.error('Error adding last_stop_message column to stream_history:', err.message);
+        }
+      });
       
       db.run(`ALTER TABLE users ADD COLUMN user_role TEXT DEFAULT 'admin'`, (err) => {
         if (err && !err.message.includes('duplicate column name')) {
