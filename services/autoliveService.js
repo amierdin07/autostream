@@ -216,10 +216,11 @@ class AutoliveService {
 
       // 3. Prepare future sessions (calling YouTube API)
       const isFailedOrFinished = linkedStream && (linkedStream.status === 'offline' || linkedStream.status === 'done');
-      const shouldPrepare = !isPastSession && !isFailedOrFinished && (timeToTarget <= PREPARE_WINDOW_MS || series.repeat_mode === 'nonstop');
+      // Ensure we only prepare future sessions (timeToTarget >= 0)
+      const shouldPrepare = timeToTarget >= 0 && !isPastSession && !isFailedOrFinished && (timeToTarget <= PREPARE_WINDOW_MS || series.repeat_mode === 'nonstop');
       if (shouldPrepare) {
         const lastSync = series.last_metadata_update ? new Date(series.last_metadata_update).getTime() : 0;
-        const shouldSync = !linkedStream || (now.getTime() - lastSync > 30 * 60 * 1000) || timeToTarget < 5 * 60 * 1000;
+        const shouldSync = !linkedStream || (now.getTime() - lastSync > 30 * 60 * 1000) || (timeToTarget >= 0 && timeToTarget < 5 * 60 * 1000);
         
         if (shouldSync) {
           console.log(`[Autolive] Preparing YouTube broadcast for session ${targetStart.toISOString()} of "${series.name}"...`);

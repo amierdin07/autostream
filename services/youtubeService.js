@@ -7,6 +7,10 @@ const fs = require('fs');
 const path = require('path');
 
 const loggedAlreadyHasBroadcast = new Set();
+const syncedThumbnails = new Map();
+const syncedMonetization = new Set();
+const syncedPlaylists = new Map();
+const syncedBindings = new Set();
 
 function getYouTubeOAuth2Client(clientId, clientSecret, redirectUri) {
   return new google.auth.OAuth2(clientId, clientSecret, redirectUri);
@@ -342,10 +346,11 @@ async function createYouTubeBroadcast(streamId, baseUrl) {
     // broadcast may be undefined here; use broadcastId for all subsequent calls
   }
 
-  if (stream.youtube_monetization) {
+  if (stream.youtube_monetization && !syncedMonetization.has(streamId)) {
     try {
       await syncBroadcastMonetization(youtube, broadcastId, true);
       console.log(`[YouTubeService] Enabled monetization for broadcast ${broadcastId}`);
+      syncedMonetization.add(streamId);
     } catch (monetizationError) {
       console.warn(`[YouTubeService] Failed to enable monetization for broadcast ${broadcastId}. Continuing without monetization. Error: ${monetizationError.message}`);
       await Stream.update(streamId, { youtube_monetization: false });
@@ -399,7 +404,8 @@ async function createYouTubeBroadcast(streamId, baseUrl) {
   }
 
   // Always upload thumbnail during broadcast check/creation to ensure it is in sync.
-  if (stream.youtube_thumbnail) {
+  // Using in-memory cache to avoid duplicate uploads if the file path hasn't changed.
+  if (stream.youtube_thumbnail && syncedThumbnails.get(streamId) !== stream.youtube_thumbnail) {
     console.log(`[YouTubeService] Attempting initial thumbnail upload for ${broadcastId}: ${stream.youtube_thumbnail}`);
     try {
       const thumbnailPath = resolveThumbnailPath(stream.youtube_thumbnail);
@@ -415,6 +421,7 @@ async function createYouTubeBroadcast(streamId, baseUrl) {
           }
         });
         console.log(`[YouTubeService] Uploaded thumbnail for broadcast ${broadcastId}`);
+        syncedThumbnails.set(streamId, stream.youtube_thumbnail);
       } else {
         console.warn(`[YouTubeService] Thumbnail file not found at any resolved path: ${stream.youtube_thumbnail}`);
       }
@@ -482,7 +489,7 @@ async function createYouTubeBroadcast(streamId, baseUrl) {
 
   // CRITICAL FIX: Always ensure binding even if reusing IDs
   // This prevents the "Ghost Stream" / Double Thumbnail issue
-  if (broadcastId && youtubeStreamId) {
+  if (broadcastId && youtubeStreamId && !syncedBindings.has(streamId)) {
       try {
           const checkBroadcast = await youtube.liveBroadcasts.list({
               part: 'contentDetails',
@@ -498,13 +505,14 @@ async function createYouTubeBroadcast(streamId, baseUrl) {
                   streamId: youtubeStreamId
               });
           }
+          syncedBindings.add(streamId);
       } catch (bindError) {
           console.warn(`[YouTubeService] Binding check/re-bind failed:`, bindError.message);
       }
   }
 
   // Handle Playlist Assignment
-  if (stream.youtube_playlist_id) {
+  if (stream.youtube_playlist_id && syncedPlaylists.get(streamId) !== stream.youtube_playlist_id) {
     try {
       console.log(`[YouTubeService] Adding broadcast ${broadcastId} to playlist ${stream.youtube_playlist_id}`);
       await youtube.playlistItems.insert({
@@ -520,6 +528,7 @@ async function createYouTubeBroadcast(streamId, baseUrl) {
         }
       });
       console.log(`[YouTubeService] Successfully added to playlist`);
+      syncedPlaylists.set(streamId, stream.youtube_playlist_id);
     } catch (playlistError) {
       console.warn(`[YouTubeService] Failed to add broadcast to playlist: ${playlistError.message}`);
     }

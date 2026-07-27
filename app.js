@@ -4753,6 +4753,64 @@ app.get('/api/youtube-apps', isAuthenticated, async (req, res) => {
   }
 });
 
+app.post('/api/youtube-apps', isAuthenticated, async (req, res) => {
+  try {
+    const YoutubeApp = require('./models/YoutubeApp');
+    const { encrypt } = require('./utils/encryption');
+    const { name, client_id, client_secret } = req.body;
+    
+    if (!name || !client_id || !client_secret) {
+      return res.status(400).json({ success: false, error: 'Nama, Client ID, dan Client Secret wajib diisi' });
+    }
+    
+    const app = await YoutubeApp.create({
+      user_id: req.session.userId,
+      name,
+      client_id,
+      client_secret: encrypt(client_secret)
+    });
+    
+    res.json({ success: true, app });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+app.put('/api/youtube-apps/:id', isAuthenticated, async (req, res) => {
+  try {
+    const YoutubeApp = require('./models/YoutubeApp');
+    const { encrypt } = require('./utils/encryption');
+    const { name, client_id, client_secret } = req.body;
+    
+    const updateData = { name, client_id };
+    if (client_secret) {
+      updateData.client_secret = encrypt(client_secret);
+    }
+    
+    const success = await YoutubeApp.update(req.params.id, req.session.userId, updateData);
+    if (!success) {
+      return res.status(404).json({ success: false, error: 'Aplikasi tidak ditemukan atau tidak memiliki hak akses' });
+    }
+    
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+app.delete('/api/youtube-apps/:id', isAuthenticated, async (req, res) => {
+  try {
+    const YoutubeApp = require('./models/YoutubeApp');
+    const success = await YoutubeApp.delete(req.params.id, req.session.userId);
+    if (!success) {
+      return res.status(404).json({ success: false, error: 'Aplikasi tidak ditemukan atau tidak memiliki hak akses' });
+    }
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 // --- Injected Autolive Routes ---
 app.get('/autolive', isAuthenticated, async (req, res) => {
   try {
