@@ -41,30 +41,30 @@
       <div class="bg-dark-800 border border-gray-700/50 rounded-xl overflow-hidden hover:border-primary/50 transition-all group" data-series-id="<%= item.id %>">
         <div class="p-5">
           <div class="flex justify-between items-start mb-4">
-            <div class="flex items-center gap-3">
-              <div class="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center text-primary">
+            <div class="flex items-center gap-3 min-w-0 flex-1">
+              <div class="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center text-primary flex-shrink-0">
                 <i class="ti ti-bolt text-xl"></i>
               </div>
-              <div>
-                <h3 class="font-bold text-white group-hover:text-primary transition-colors"><%= item.name %></h3>
+              <div class="min-w-0 flex-1">
+                <h3 class="font-bold text-white group-hover:text-primary transition-colors truncate"><%= item.name %></h3>
                 <div class="flex flex-wrap items-center gap-1.5 mt-1">
-                    <span class="text-[9px] bg-dark-900 text-gray-400 px-1.5 py-0.5 rounded border border-gray-700/50 flex items-center gap-1">
-                        <i class="ti ti-<%= item.internal_playlist_id ? 'list-details' : 'video' %> text-[10px]"></i>
-                        <span class="max-w-[100px] truncate"><%= item.internal_playlist_id ? item.internal_playlist_name : item.video_title %></span>
+                    <span class="text-[9px] bg-dark-900 text-gray-400 px-1.5 py-0.5 rounded border border-gray-700/50 flex items-center gap-1 min-w-0 max-w-full">
+                        <i class="ti ti-<%= item.internal_playlist_id ? 'list-details' : 'video' %> text-[10px] flex-shrink-0"></i>
+                        <span class="truncate"><%= item.internal_playlist_id ? item.internal_playlist_name : item.video_title %></span>
                     </span>
-                    <span class="text-[9px] text-primary font-bold bg-primary/10 px-1.5 py-0.5 rounded border border-primary/20">
+                    <span class="text-[9px] text-primary font-bold bg-primary/10 px-1.5 py-0.5 rounded border border-primary/20 flex-shrink-0">
                         <%= item.current_item_index + 1 %> / <%= item.item_count %>
                     </span>
                     <% if (item.status === 'live' && item.current_item_title) { %>
-                        <div class="w-full mt-1.5 text-[10px] text-green-400 font-medium flex items-center gap-1">
-                            <i class="ti ti-typography"></i>
+                        <div class="w-full mt-1.5 text-[10px] text-green-400 font-medium flex items-center gap-1 min-w-0">
+                            <i class="ti ti-typography flex-shrink-0"></i>
                             <span class="truncate italic">"<%= item.current_item_title %>"</span>
                         </div>
                     <% } %>
                 </div>
               </div>
             </div>
-            <div class="flex items-center gap-2">
+            <div class="flex items-center gap-2 flex-shrink-0">
               <button onclick="editSeries('<%= item.id %>')" class="px-2.5 py-1.5 text-gray-400 hover:text-white hover:bg-gray-700 rounded-lg transition-all flex items-center gap-1.5 border border-gray-750" title="Edit">
                 <i class="ti ti-edit"></i>
                 <span class="text-xs font-bold">Edit</span>
