@@ -398,9 +398,8 @@ async function createYouTubeBroadcast(streamId, baseUrl) {
     }
   }
 
-  // Only upload thumbnail during initial broadcast creation (!isReused) to save quota.
-  // Manual updates/edits will call updateLiveMetadata which handles thumbnail updates.
-  if (stream.youtube_thumbnail && !isReused) {
+  // Always upload thumbnail during broadcast check/creation to ensure it is in sync.
+  if (stream.youtube_thumbnail) {
     console.log(`[YouTubeService] Attempting initial thumbnail upload for ${broadcastId}: ${stream.youtube_thumbnail}`);
     try {
       const thumbnailPath = resolveThumbnailPath(stream.youtube_thumbnail);
