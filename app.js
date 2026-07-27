@@ -4757,17 +4757,17 @@ app.post('/api/youtube-apps', isAuthenticated, async (req, res) => {
   try {
     const YoutubeApp = require('./models/YoutubeApp');
     const { encrypt } = require('./utils/encryption');
-    const { name, client_id, client_secret } = req.body;
+    const { name, clientId, clientSecret } = req.body;
     
-    if (!name || !client_id || !client_secret) {
+    if (!name || !clientId || !clientSecret) {
       return res.status(400).json({ success: false, error: 'Nama, Client ID, dan Client Secret wajib diisi' });
     }
     
     const app = await YoutubeApp.create({
       user_id: req.session.userId,
       name,
-      client_id,
-      client_secret: encrypt(client_secret)
+      client_id: clientId,
+      client_secret: encrypt(clientSecret)
     });
     
     res.json({ success: true, app });
@@ -4780,11 +4780,13 @@ app.put('/api/youtube-apps/:id', isAuthenticated, async (req, res) => {
   try {
     const YoutubeApp = require('./models/YoutubeApp');
     const { encrypt } = require('./utils/encryption');
-    const { name, client_id, client_secret } = req.body;
+    const { name, clientId, clientSecret } = req.body;
     
-    const updateData = { name, client_id };
-    if (client_secret) {
-      updateData.client_secret = encrypt(client_secret);
+    const updateData = {};
+    if (name) updateData.name = name;
+    if (clientId) updateData.client_id = clientId;
+    if (clientSecret) {
+      updateData.client_secret = encrypt(clientSecret);
     }
     
     const success = await YoutubeApp.update(req.params.id, req.session.userId, updateData);
