@@ -5499,6 +5499,9 @@ const server = app.listen(port, '0.0.0.0', async () => {
     await initializeDatabase();
     const autoliveService = require('./services/autoliveService');
     autoliveService.init();
+    
+    const telegramBotService = require('./services/telegramBotService');
+    telegramBotService.init();
 
   } catch (error) {
     console.error('Failed to initialize database:', error);
