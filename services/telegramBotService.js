@@ -72,7 +72,7 @@ async function sendTelegramReply(token, chatId, text) {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'Content-Length': data.length
+      'Content-Length': Buffer.byteLength(data)
     }
   };
   
@@ -119,6 +119,7 @@ async function processCommand(text, token, chatId) {
     try {
       const liveStreams = await Stream.findAll(null, 'live');
       const scheduledStreams = await Stream.findAll(null, 'scheduled');
+      const Video = require('../models/Video');
       
       let listMessage = `📋 <b>Daftar Siaran Aktif & Terjadwal:</b>\n\n`;
       
@@ -127,15 +128,21 @@ async function processCommand(text, token, chatId) {
       } else {
         if (liveStreams.length > 0) {
           listMessage += `🟢 <b>LIVE:</b>\n`;
-          liveStreams.forEach(s => {
-            listMessage += `- <b>${s.title}</b>\n  ID: <code>${s.id}</code>\n\n`;
-          });
+          for (const s of liveStreams) {
+            const video = s.video_id ? await Video.findById(s.video_id) : null;
+            const videoTitle = video ? video.title : 'Playlist / Rotasi';
+            const timeStr = s.start_time ? new Date(s.start_time).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) : '--:--';
+            listMessage += `- Task: <b>${s.title}</b>\n  Video: <i>${videoTitle}</i>\n  Jam Mulai: <code>${timeStr} WIB</code>\n\n`;
+          }
         }
         if (scheduledStreams.length > 0) {
-          listMessage += `⏳ <b>Terjadwal:</b>\n`;
-          scheduledStreams.forEach(s => {
-            listMessage += `- <b>${s.title}</b>\n  ID: <code>${s.id}</code>\n\n`;
-          });
+          listMessage += `⏳ <b>TERJADWAL:</b>\n`;
+          for (const s of scheduledStreams) {
+            const video = s.video_id ? await Video.findById(s.video_id) : null;
+            const videoTitle = video ? video.title : 'Playlist / Rotasi';
+            const timeStr = s.schedule_time ? new Date(s.schedule_time).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) : '--:--';
+            listMessage += `- Task: <b>${s.title}</b>\n  Video: <i>${videoTitle}</i>\n  Jadwal: <code>${timeStr} WIB</code>\n\n`;
+          }
         }
       }
       
