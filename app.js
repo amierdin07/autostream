@@ -2437,6 +2437,18 @@ app.post('/api/settings/telegram', isAuthenticated, async (req, res) => {
     await AppSettings.set('telegram_bot_token', telegram_bot_token || '');
     await AppSettings.set('telegram_chat_id', telegram_chat_id || '');
     
+    if (telegram_bot_token && telegram_chat_id) {
+      try {
+        const { sendTelegramMessage } = require('./utils/telegramHelper');
+        const testResult = await sendTelegramMessage(`🤖 <b>Koneksi Autostream Berhasil!</b>\n\nSelamat, bot Telegram Anda kini telah sukses terhubung ke server VPS dan siap mengirimkan laporan live streaming.`);
+        if (!testResult.success) {
+          return res.redirect(`/settings?error=Telegram tersimpan, tapi tes kirim gagal: ${testResult.error}. Pastikan Anda sudah klik START di bot Anda!&activeTab=vps`);
+        }
+      } catch (telErr) {
+        console.error('Failed to send test Telegram message:', telErr);
+      }
+    }
+    
     return res.redirect('/settings?success=Telegram settings updated successfully&activeTab=vps');
   } catch (error) {
     console.error('Error saving Telegram settings:', error);
