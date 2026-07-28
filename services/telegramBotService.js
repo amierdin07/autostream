@@ -21,7 +21,7 @@ async function handleUpdates() {
     
     if (!token || !chatId) return;
 
-    const url = `https://api.telegram.org/bot\${token}/getUpdates?offset=\${lastUpdateId + 1}&timeout=0`;
+    const url = `https://api.telegram.org/bot${token}/getUpdates?offset=${lastUpdateId + 1}&timeout=0`;
     
     https.get(url, (res) => {
       let body = '';
@@ -39,7 +39,7 @@ async function handleUpdates() {
               
               // Only respond to messages from the authorized user
               if (messageChatId !== String(chatId)) {
-                console.warn(`[TelegramBot] Unauthorized message from chat ID: \${messageChatId}`);
+                console.warn(`[TelegramBot] Unauthorized message from chat ID: ${messageChatId}`);
                 continue;
               }
               
@@ -68,7 +68,7 @@ async function sendTelegramReply(token, chatId, text) {
   const options = {
     hostname: 'api.telegram.org',
     port: 443,
-    path: `/bot\${token}/sendMessage`,
+    path: `/bot${token}/sendMessage`,
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -105,14 +105,14 @@ async function processCommand(text, token, chatId) {
       const liveStreams = await Stream.findAll(null, 'live');
       
       const statusMessage = `📊 <b>Status Server & Siaran:</b>\n\n` +
-        `🖥️ <b>CPU:</b> <code>\${stats.cpu.usage}%</code> (\${stats.cpu.cores} Cores)\n` +
-        `💾 <b>RAM:</b> <code>\${stats.memory.used} / \${stats.memory.total}</code> (\${stats.memory.usagePercent}%)\n` +
-        `💽 <b>Disk:</b> <code>\${stats.disk.used} / \${stats.disk.total}</code> (\${stats.disk.usagePercent}%)\n` +
-        `🌐 <b>Sinyal Live:</b> <code>\${liveStreams.length} siaran aktif</code>`;
+        `🖥️ <b>CPU:</b> <code>${stats.cpu.usage}%</code> (${stats.cpu.cores} Cores)\n` +
+        `💾 <b>RAM:</b> <code>${stats.memory.used} / ${stats.memory.total}</code> (${stats.memory.usagePercent}%)\n` +
+        `💽 <b>Disk:</b> <code>${stats.disk.used} / ${stats.disk.total}</code> (${stats.disk.usagePercent}%)\n` +
+        `🌐 <b>Sinyal Live:</b> <code>${liveStreams.length} siaran aktif</code>`;
       
       await sendTelegramReply(token, chatId, statusMessage);
     } catch (err) {
-      await sendTelegramReply(token, chatId, `❌ Gagal mengambil status server: \${err.message}`);
+      await sendTelegramReply(token, chatId, `❌ Gagal mengambil status server: ${err.message}`);
     }
   } 
   else if (command === '/list') {
@@ -128,20 +128,20 @@ async function processCommand(text, token, chatId) {
         if (liveStreams.length > 0) {
           listMessage += `🟢 <b>LIVE:</b>\n`;
           liveStreams.forEach(s => {
-            listMessage += `- <b>\${s.title}</b>\n  ID: <code>\${s.id}</code>\n\n`;
+            listMessage += `- <b>${s.title}</b>\n  ID: <code>${s.id}</code>\n\n`;
           });
         }
         if (scheduledStreams.length > 0) {
           listMessage += `⏳ <b>Terjadwal:</b>\n`;
           scheduledStreams.forEach(s => {
-            listMessage += `- <b>\${s.title}</b>\n  ID: <code>\${s.id}</code>\n\n`;
+            listMessage += `- <b>${s.title}</b>\n  ID: <code>${s.id}</code>\n\n`;
           });
         }
       }
       
       await sendTelegramReply(token, chatId, listMessage);
     } catch (err) {
-      await sendTelegramReply(token, chatId, `❌ Gagal mengambil daftar siaran: \${err.message}`);
+      await sendTelegramReply(token, chatId, `❌ Gagal mengambil daftar siaran: ${err.message}`);
     }
   } 
   else if (command === '/start_stream') {
@@ -154,12 +154,12 @@ async function processCommand(text, token, chatId) {
       const result = await streamingService.startStream(arg, false, baseUrl);
       
       if (result.success) {
-        await sendTelegramReply(token, chatId, `▶️ Siaran <code>\${arg}</code> berhasil dimulai!`);
+        await sendTelegramReply(token, chatId, `▶️ Siaran <code>${arg}</code> berhasil dimulai!`);
       } else {
-        await sendTelegramReply(token, chatId, `❌ Gagal memulai siaran: <code>\${result.error}</code>`);
+        await sendTelegramReply(token, chatId, `❌ Gagal memulai siaran: <code>${result.error}</code>`);
       }
     } catch (err) {
-      await sendTelegramReply(token, chatId, `❌ Error: \text{\${err.message}}`);
+      await sendTelegramReply(token, chatId, `❌ Error: ${err.message}`);
     }
   } 
   else if (command === '/stop_stream') {
@@ -169,9 +169,9 @@ async function processCommand(text, token, chatId) {
     try {
       const streamingService = require('./streamingService');
       await streamingService.stopStream(arg);
-      await sendTelegramReply(token, chatId, `⏹️ Siaran <code>\${arg}</code> berhasil dihentikan!`);
+      await sendTelegramReply(token, chatId, `⏹️ Siaran <code>${arg}</code> berhasil dihentikan!`);
     } catch (err) {
-      await sendTelegramReply(token, chatId, `❌ Error saat menghentikan siaran: \text{\${err.message}}`);
+      await sendTelegramReply(token, chatId, `❌ Error saat menghentikan siaran: ${err.message}`);
     }
   } 
   else if (command === '/stop_all') {
@@ -184,9 +184,9 @@ async function processCommand(text, token, chatId) {
       for (const s of liveStreams) {
         await streamingService.stopStream(s.id);
       }
-      await sendTelegramReply(token, chatId, `⏹️ Semua (\${liveStreams.length}) siaran aktif berhasil dihentikan.`);
+      await sendTelegramReply(token, chatId, `⏹️ Semua (${liveStreams.length}) siaran aktif berhasil dihentikan.`);
     } catch (err) {
-      await sendTelegramReply(token, chatId, `❌ Error: \text{\${err.message}}`);
+      await sendTelegramReply(token, chatId, `❌ Error: ${err.message}`);
     }
   } 
   else {
