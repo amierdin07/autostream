@@ -554,6 +554,15 @@ function checkIfUsersExist() {
 async function initializeDatabase() {
   await createTables();
   console.log('Database tables initialized successfully');
+  
+  // Clean up old autolive streams that do not have a timestamp suffix
+  db.run("DELETE FROM streams WHERE id LIKE 'autolive_%' AND id NOT LIKE 'autolive_%_%'", [], (err) => {
+    if (err) {
+      console.error('Error cleaning up old autolive streams:', err.message);
+    } else {
+      console.log('Successfully cleaned up old autolive streams from database');
+    }
+  });
 }
 
 module.exports = {

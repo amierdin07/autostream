@@ -426,7 +426,14 @@ async function validateCopyModeCompatibilityForInput({
     if (streamId && streamId.startsWith('autolive_')) {
       try {
         const Autolive = require('../models/Autolive');
-        const seriesId = streamId.replace('autolive_', '');
+        let seriesId = streamId.replace('autolive_', '');
+        if (seriesId.includes('_')) {
+          const parts = seriesId.split('_');
+          if (parts.length > 1 && /^\d+$/.test(parts[parts.length - 1])) {
+            parts.pop();
+            seriesId = parts.join('_');
+          }
+        }
         const series = await Autolive.findById(seriesId);
         if (series && series.is_random_video === 1 && series.current_video_id) {
           playlist.videos = playlist.videos.filter(v => v.id === series.current_video_id);
@@ -545,7 +552,14 @@ async function buildFFmpegArgsForPlaylist(stream, playlist) {
   if (stream.id && stream.id.startsWith('autolive_')) {
     try {
       const Autolive = require('../models/Autolive');
-      const seriesId = stream.id.replace('autolive_', '');
+      let seriesId = stream.id.replace('autolive_', '');
+      if (seriesId.includes('_')) {
+        const parts = seriesId.split('_');
+        if (parts.length > 1 && /^\d+$/.test(parts[parts.length - 1])) {
+          parts.pop();
+          seriesId = parts.join('_');
+        }
+      }
       const series = await Autolive.findById(seriesId);
       if (series && series.is_random_video === 1 && series.current_video_id) {
         const filtered = playlist.videos.filter(v => v.id === series.current_video_id);
