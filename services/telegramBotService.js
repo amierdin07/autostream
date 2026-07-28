@@ -34,6 +34,20 @@ async function handleUpdates() {
           for (const update of data.result) {
             lastUpdateId = update.update_id;
             
+            // Handle callback buttons (Start/Stop button clicks)
+            if (update.callback_query) {
+              const callbackQuery = update.callback_query;
+              const command = callbackQuery.data;
+              const fromChatId = String(callbackQuery.message.chat.id);
+              
+              if (fromChatId === String(chatId)) {
+                await processCommand(command, token, chatId);
+                await answerCallbackQuery(token, callbackQuery.id);
+              }
+              continue;
+            }
+
+            // Handle text commands
             if (update.message && update.message.text) {
               const messageChatId = String(update.message.chat.id);
               
@@ -58,12 +72,42 @@ async function handleUpdates() {
   }
 }
 
-async function sendTelegramReply(token, chatId, text) {
+async function answerCallbackQuery(token, callbackQueryId) {
   const data = JSON.stringify({
+    callback_query_id: callbackQueryId
+  });
+  
+  const options = {
+    hostname: 'api.telegram.org',
+    port: 443,
+    path: `/bot${token}/answerCallbackQuery`,
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Content-Length': Buffer.byteLength(data)
+    }
+  };
+  
+  return new Promise((resolve) => {
+    const req = https.request(options, () => resolve());
+    req.on('error', () => resolve());
+    req.write(data);
+    req.end();
+  });
+}
+
+async function sendTelegramReply(token, chatId, text, replyMarkup = null) {
+  const payload = {
     chat_id: chatId,
     text: text,
     parse_mode: 'HTML'
-  });
+  };
+  
+  if (replyMarkup) {
+    payload.reply_markup = replyMarkup;
+  }
+  
+  const data = JSON.stringify(payload);
   
   const options = {
     hostname: 'api.telegram.org',
@@ -93,7 +137,7 @@ async function processCommand(text, token, chatId) {
     const helpMessage = `🤖 <b>Autostream Bot Kontrol</b>\n\n` +
       `Halo! Anda bisa mengontrol server Autostream Anda lewat perintah berikut:\n\n` +
       `📊 <b>/status</b> - Cek penggunaan CPU, RAM, & status siaran saat ini.\n` +
-      `📋 <b>/list</b> - Daftar semua siaran (live & terjadwal).\n` +
+      `📋 <b>/list</b> - Daftar semua siaran (live & terjadwal) lengkap dengan tombol kontrol.\n` +
       `▶️ <b>/start_stream [ID]</b> - Mulai siaran secara manual.\n` +
       `⏹️ <b>/stop_stream [ID]</b> - Hentikan siaran secara manual.\n` +
       `⚠️ <b>/stop_all</b> - Matikan semua siaran yang sedang jalan.`;
@@ -119,6 +163,7 @@ async function processCommand(text, token, chatId) {
     try {
       const liveStreams = await Stream.findAll(null, 'live');
       const scheduledStreams = await Stream.findAll(null, 'scheduled');
+      const buttons = [];
       
       let listMessage = `📋 <b>Daftar Siaran Aktif & Terjadwal:</b>\n\n`;
       
@@ -132,6 +177,11 @@ async function processCommand(text, token, chatId) {
             const videoTitle = details ? (details.video_type === 'playlist' ? details.playlist_name : (details.video_title || 'N/A')) : 'N/A';
             const timeStr = s.start_time ? new Date(s.start_time).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) : '--:--';
             listMessage += `- Task: <b>${s.title}</b>\n  Video/Playlist: <i>${videoTitle}</i>\n  Jam Mulai: <code>${timeStr} WIB</code>\n\n`;
+            
+            // Add red button to stop the running stream
+            buttons.push([
+              { text: `🛑 Stop: ${s.title}`, callback_data: `/stop_stream ${s.id}` }
+            ]);
           }
         }
         if (scheduledStreams.length > 0) {
@@ -141,11 +191,17 @@ async function processCommand(text, token, chatId) {
             const videoTitle = details ? (details.video_type === 'playlist' ? details.playlist_name : (details.video_title || 'N/A')) : 'N/A';
             const timeStr = s.schedule_time ? new Date(s.schedule_time).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) : '--:--';
             listMessage += `- Task: <b>${s.title}</b>\n  Video/Playlist: <i>${videoTitle}</i>\n  Jadwal: <code>${timeStr} WIB</code>\n\n`;
+            
+            // Add green button to start the scheduled stream manually
+            buttons.push([
+              { text: `▶️ Start: ${s.title}`, callback_data: `/start_stream ${s.id}` }
+            ]);
           }
         }
       }
       
-      await sendTelegramReply(token, chatId, listMessage);
+      const replyMarkup = buttons.length > 0 ? { inline_keyboard: buttons } : null;
+      await sendTelegramReply(token, chatId, listMessage, replyMarkup);
     } catch (err) {
       await sendTelegramReply(token, chatId, `❌ Gagal mengambil daftar siaran: ${err.message}`);
     }
@@ -157,10 +213,12 @@ async function processCommand(text, token, chatId) {
     try {
       const streamingService = require('./streamingService');
       const baseUrl = process.env.BASE_URL || 'http://localhost:7575';
+      
+      await sendTelegramReply(token, chatId, `⏳ Sedang menyalakan siaran...`);
       const result = await streamingService.startStream(arg, false, baseUrl);
       
       if (result.success) {
-        await sendTelegramReply(token, chatId, `▶️ Siaran <code>${arg}</code> berhasil dimulai!`);
+        await sendTelegramReply(token, chatId, `▶️ Siaran berhasil dimulai!`);
       } else {
         await sendTelegramReply(token, chatId, `❌ Gagal memulai siaran: <code>${result.error}</code>`);
       }
@@ -174,8 +232,10 @@ async function processCommand(text, token, chatId) {
     }
     try {
       const streamingService = require('./streamingService');
+      
+      await sendTelegramReply(token, chatId, `⏳ Sedang menghentikan siaran...`);
       await streamingService.stopStream(arg);
-      await sendTelegramReply(token, chatId, `⏹️ Siaran <code>${arg}</code> berhasil dihentikan!`);
+      await sendTelegramReply(token, chatId, `⏹️ Siaran berhasil dihentikan!`);
     } catch (err) {
       await sendTelegramReply(token, chatId, `❌ Error saat menghentikan siaran: ${err.message}`);
     }
