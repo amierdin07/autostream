@@ -310,10 +310,14 @@ async function createYouTubeBroadcast(streamId, baseUrl) {
   // broadcastId is already declared at the top
 
   if (!broadcastId) {
+    let scheduledDate = stream.schedule_time ? new Date(stream.schedule_time) : new Date();
+    if (scheduledDate.getTime() < Date.now()) {
+      scheduledDate = new Date(Date.now() + 5000); // 5 seconds in the future
+    }
     const broadcastSnippet = {
       title: stream.title,
       description: stream.youtube_description || '',
-      scheduledStartTime: stream.schedule_time ? new Date(stream.schedule_time).toISOString() : new Date().toISOString()
+      scheduledStartTime: scheduledDate.toISOString()
     };
 
     console.log(`[YouTubeService] Creating YouTube broadcast for stream ${streamId}`);
@@ -436,28 +440,60 @@ async function createYouTubeBroadcast(streamId, baseUrl) {
   // rtmpUrl, streamKey, youtubeStreamId are already declared at the top
 
   if (!youtubeStreamId || !rtmpUrl || !streamKey) {
-    const streamResponse = await youtube.liveStreams.insert({
-        part: 'snippet,cdn,contentDetails,status',
-        requestBody: {
-            snippet: {
-                title: `${stream.title} - Stream`
-            },
-            cdn: {
-                frameRate: '30fps',
-                ingestionType: 'rtmp',
-                resolution: mapResolutionToYouTube(stream.resolution)
-            },
-            contentDetails: {
-                isReusable: false
-            }
-        }
-    });
+    let existingStreams = [];
+    try {
+      const listResponse = await youtube.liveStreams.list({
+        part: 'id,cdn,status',
+        mine: true,
+        maxResults: 50
+      });
+      existingStreams = listResponse.data.items || [];
+    } catch (listErr) {
+      console.warn('[YouTubeService] Failed to list existing live streams:', listErr.message);
+    }
 
-    const liveStream = streamResponse.data;
-    youtubeStreamId = liveStream.id;
-    rtmpUrl = liveStream.cdn.ingestionInfo.ingestionAddress;
-    streamKey = liveStream.cdn.ingestionInfo.streamName;
-    console.log(`[YouTubeService] Created live stream: ${youtubeStreamId}`);
+    const rtmpStreams = existingStreams.filter(s => s.cdn && s.cdn.ingestionType === 'rtmp');
+
+    if (rtmpStreams.length > 0) {
+      // Deterministic selection based on streamId hash to avoid duplicates in concurrent runs
+      const getHash = (str) => {
+        let hash = 0;
+        for (let i = 0; i < str.length; i++) {
+          hash = str.charCodeAt(i) + ((hash << 5) - hash);
+        }
+        return Math.abs(hash);
+      };
+      const selectedIndex = getHash(streamId) % rtmpStreams.length;
+      const liveStream = rtmpStreams[selectedIndex];
+      
+      youtubeStreamId = liveStream.id;
+      rtmpUrl = liveStream.cdn.ingestionInfo.ingestionAddress;
+      streamKey = liveStream.cdn.ingestionInfo.streamName;
+      console.log(`[YouTubeService] Reusing existing live stream key (Index ${selectedIndex}): ${youtubeStreamId}`);
+    } else {
+      const streamResponse = await youtube.liveStreams.insert({
+          part: 'snippet,cdn,contentDetails,status',
+          requestBody: {
+              snippet: {
+                  title: `${stream.title} - Stream`
+              },
+              cdn: {
+                  frameRate: '30fps',
+                  ingestionType: 'rtmp',
+                  resolution: mapResolutionToYouTube(stream.resolution)
+              },
+              contentDetails: {
+                  isReusable: false
+              }
+          }
+      });
+
+      const liveStream = streamResponse.data;
+      youtubeStreamId = liveStream.id;
+      rtmpUrl = liveStream.cdn.ingestionInfo.ingestionAddress;
+      streamKey = liveStream.cdn.ingestionInfo.streamName;
+      console.log(`[YouTubeService] Created live stream dynamically: ${youtubeStreamId}`);
+    }
 
     try {
         await youtube.liveBroadcasts.bind({

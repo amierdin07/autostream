@@ -134,6 +134,12 @@ class AutoliveService {
           await this.processSeries(series, now);
         } catch (seriesError) {
           console.error(`[Autolive] Error processing series "${series.name || series.id}":`, seriesError);
+          try {
+            const { sendTelegramMessage } = require('../utils/telegramHelper');
+            await sendTelegramMessage(`⚠️ <b>Autolive Error:</b>\n\nSeries: <b>${series.name || series.id}</b>\nError: <code>${seriesError.message || seriesError}</code>`);
+          } catch (telErr) {
+            console.error('Failed to send Telegram notification:', telErr.message);
+          }
         }
       }
     } catch (error) {

@@ -49,6 +49,25 @@ async function checkScheduledStreams() {
 
       if (!result.success) {
         console.error(`[Scheduler] Failed to start stream ${stream.id}: ${result.error}`);
+        try {
+          const Video = require('../models/Video');
+          const video = stream.video_id ? await Video.findById(stream.video_id) : null;
+          const videoTitle = video ? video.title : 'Playlist / Rotasi';
+          const { sendTelegramMessage } = require('../utils/telegramHelper');
+          await sendTelegramMessage(`❌ <b>Autostream Gagal Mulai:</b>\n\nJudul: <b>${stream.title}</b>\nVideo: <b>${videoTitle}</b>\nError: <code>${result.error}</code>`);
+        } catch (telErr) {
+          console.error('Failed to send Telegram notification:', telErr.message);
+        }
+      } else {
+        try {
+          const Video = require('../models/Video');
+          const video = stream.video_id ? await Video.findById(stream.video_id) : null;
+          const videoTitle = video ? video.title : 'Playlist / Rotasi';
+          const { sendTelegramMessage } = require('../utils/telegramHelper');
+          await sendTelegramMessage(`✅ <b>Autostream Berhasil Mulai:</b>\n\nJudul: <b>${stream.title}</b>\nVideo: <b>${videoTitle}</b>\nStatus: <b>LIVE 🟢</b>`);
+        } catch (telErr) {
+          console.error('Failed to send Telegram notification:', telErr.message);
+        }
       }
     }
   } catch (error) {

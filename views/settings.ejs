@@ -536,7 +536,7 @@
       </div>
     </div>
 
-    <div id="vps-tab" class="settings-content hidden">
+    <div id="vps-tab" class="settings-content hidden space-y-6">
       <div class="bg-gray-800 rounded-lg p-6 max-w-3xl">
         <h3 class="text-lg font-semibold mb-6">VPS Expiry Setting</h3>
         <form id="vps-expiry-form" class="space-y-6" action="/api/settings/vps-expiry" method="post">
@@ -555,10 +555,41 @@
             <p class="text-sm text-gray-400">Set the date when your VPS subscription will expire. A reminder banner will be shown on your dashboard.</p>
           </div>
           
-          <div class="pt-4">
+          <div class="pt-2">
             <button type="submit"
               class="px-4 py-2 bg-primary hover:bg-blue-600 text-white rounded-lg transition-colors">
               Save Expiry Date
+            </button>
+          </div>
+        </form>
+      </div>
+
+      <div class="bg-gray-800 rounded-lg p-6 max-w-3xl">
+        <h3 class="text-lg font-semibold mb-6">Telegram Notification Settings</h3>
+        <form id="telegram-settings-form" class="space-y-6" action="/api/settings/telegram" method="post">
+          <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+          
+          <div class="space-y-2">
+            <label for="telegram_bot_token" class="block text-sm font-medium text-gray-300">Telegram Bot Token</label>
+            <input type="text" id="telegram_bot_token" name="telegram_bot_token"
+              class="bg-dark-900 text-white px-4 py-2 rounded-lg block w-full sm:max-w-md focus:outline-none focus:ring-1 focus:ring-primary"
+              placeholder="e.g. 123456789:ABCdefGhIJKlmNoPQRsTUVwxyZ"
+              value="<%= typeof telegramBotToken !== 'undefined' ? telegramBotToken : '' %>">
+          </div>
+
+          <div class="space-y-2">
+            <label for="telegram_chat_id" class="block text-sm font-medium text-gray-300">Telegram Chat ID / User ID</label>
+            <input type="text" id="telegram_chat_id" name="telegram_chat_id"
+              class="bg-dark-900 text-white px-4 py-2 rounded-lg block w-full sm:max-w-md focus:outline-none focus:ring-1 focus:ring-primary"
+              placeholder="e.g. 987654321"
+              value="<%= typeof telegramChatId !== 'undefined' ? telegramChatId : '' %>">
+            <p class="text-sm text-gray-400">Notifications will be sent here when a stream fails to start.</p>
+          </div>
+          
+          <div class="pt-2">
+            <button type="submit"
+              class="px-4 py-2 bg-primary hover:bg-blue-600 text-white rounded-lg transition-colors">
+              Save Telegram Settings
             </button>
           </div>
         </form>

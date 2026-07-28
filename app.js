@@ -1002,6 +1002,8 @@ app.get('/settings', isAuthenticated, async (req, res) => {
     
     const recaptchaSettings = await AppSettings.getRecaptchaSettings();
     const vpsExpiryDate = await AppSettings.get('vps_expiry_date') || '';
+    const telegramBotToken = await AppSettings.get('telegram_bot_token') || '';
+    const telegramChatId = await AppSettings.get('telegram_chat_id') || '';
     
     res.render('settings', {
       title: 'Settings',
@@ -1022,6 +1024,8 @@ app.get('/settings', isAuthenticated, async (req, res) => {
       hasRecaptchaKeys: recaptchaSettings.hasKeys,
       recaptchaEnabled: recaptchaSettings.enabled,
       vpsExpiryDate: vpsExpiryDate,
+      telegramBotToken: telegramBotToken,
+      telegramChatId: telegramChatId,
       success: req.query.success || null,
       error: req.query.error || null,
       activeTab: req.query.activeTab || null
@@ -2422,6 +2426,21 @@ app.post('/api/settings/vps-expiry', isAuthenticated, async (req, res) => {
   } catch (error) {
     console.error('Error saving VPS expiry date:', error);
     return res.redirect('/settings?error=Failed to save VPS expiry date&activeTab=vps');
+  }
+});
+
+app.post('/api/settings/telegram', isAuthenticated, async (req, res) => {
+  try {
+    const AppSettings = require('./models/AppSettings');
+    const { telegram_bot_token, telegram_chat_id } = req.body;
+    
+    await AppSettings.set('telegram_bot_token', telegram_bot_token || '');
+    await AppSettings.set('telegram_chat_id', telegram_chat_id || '');
+    
+    return res.redirect('/settings?success=Telegram settings updated successfully&activeTab=vps');
+  } catch (error) {
+    console.error('Error saving Telegram settings:', error);
+    return res.redirect('/settings?error=Failed to save Telegram settings&activeTab=vps');
   }
 });
 
