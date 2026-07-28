@@ -163,7 +163,6 @@ async function processCommand(text, token, chatId) {
     try {
       const liveStreams = await Stream.findAll(null, 'live');
       const scheduledStreams = await Stream.findAll(null, 'scheduled');
-      const buttons = [];
       
       let listMessage = `📋 <b>Daftar Siaran Aktif & Terjadwal:</b>\n\n`;
       
@@ -177,11 +176,6 @@ async function processCommand(text, token, chatId) {
             const videoTitle = details ? (details.video_type === 'playlist' ? details.playlist_name : (details.video_title || 'N/A')) : 'N/A';
             const timeStr = s.start_time ? new Date(s.start_time).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) : '--:--';
             listMessage += `- Task: <b>${s.title}</b>\n  Video/Playlist: <i>${videoTitle}</i>\n  Jam Mulai: <code>${timeStr} WIB</code>\n\n`;
-            
-            // Add red button to stop the running stream
-            buttons.push([
-              { text: `🛑 Stop: ${s.title}`, callback_data: `/stop_stream ${s.id}` }
-            ]);
           }
         }
         if (scheduledStreams.length > 0) {
@@ -191,17 +185,11 @@ async function processCommand(text, token, chatId) {
             const videoTitle = details ? (details.video_type === 'playlist' ? details.playlist_name : (details.video_title || 'N/A')) : 'N/A';
             const timeStr = s.schedule_time ? new Date(s.schedule_time).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) : '--:--';
             listMessage += `- Task: <b>${s.title}</b>\n  Video/Playlist: <i>${videoTitle}</i>\n  Jadwal: <code>${timeStr} WIB</code>\n\n`;
-            
-            // Add green button to start the scheduled stream manually
-            buttons.push([
-              { text: `▶️ Start: ${s.title}`, callback_data: `/start_stream ${s.id}` }
-            ]);
           }
         }
       }
       
-      const replyMarkup = buttons.length > 0 ? { inline_keyboard: buttons } : null;
-      await sendTelegramReply(token, chatId, listMessage, replyMarkup);
+      await sendTelegramReply(token, chatId, listMessage);
     } catch (err) {
       await sendTelegramReply(token, chatId, `❌ Gagal mengambil daftar siaran: ${err.message}`);
     }
