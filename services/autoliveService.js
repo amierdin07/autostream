@@ -764,19 +764,17 @@ class AutoliveService {
         message: 'Autolive berhenti karena durasi atau jadwal item sudah selesai.'
       });
       
-      const newIndex = (series.current_item_index || 0) + 1;
       const stopItems = await Autolive.getItemsBySeriesId(series.id);
       const totalSessions = this.getTotalSessions(stopItems);
 
       const updateData = { 
         status: 'offline',
         youtube_broadcast_id: null,
-        youtube_stream_id: null,
-        current_item_index: newIndex
+        youtube_stream_id: null
       };
 
       // If all sessions are done, deactivate the series
-      if (newIndex >= totalSessions) {
+      if ((series.current_item_index || 0) >= totalSessions) {
         updateData.is_active = 0;
         console.log(`[Autolive] Series "${series.name}" completed all ${totalSessions} sessions. Deactivated.`);
       }
@@ -894,6 +892,11 @@ class AutoliveService {
           youtube_monetization: series.monetization_enabled === 1 ? 1 : 0,
           made_for_kids: series.made_for_kids === 1 ? 1 : 0,
           youtube_playlist_id: series.playlist_id || null
+        });
+
+        const nextIndex = globalIndex + 1;
+        await Autolive.update(series.id, {
+          current_item_index: nextIndex
         });
 
         if (stream.youtube_broadcast_id) {
