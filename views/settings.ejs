@@ -30,6 +30,11 @@
       </button>
       <button
         class="settings-tab mr-2 py-2 px-4 text-gray-400 hover:text-blue-600 border-b-2 border-transparent hover:border-blue-600 font-medium"
+        data-tab="vps">
+        <i class="ti ti-server mr-2"></i>VPS Expiry
+      </button>
+      <button
+        class="settings-tab mr-2 py-2 px-4 text-gray-400 hover:text-blue-600 border-b-2 border-transparent hover:border-blue-600 font-medium"
         data-tab="about">
         <i class="ti ti-info-circle mr-2"></i>About
       </button>
@@ -531,6 +536,35 @@
       </div>
     </div>
 
+    <div id="vps-tab" class="settings-content hidden">
+      <div class="bg-gray-800 rounded-lg p-6 max-w-3xl">
+        <h3 class="text-lg font-semibold mb-6">VPS Expiry Setting</h3>
+        <form id="vps-expiry-form" class="space-y-6" action="/api/settings/vps-expiry" method="post">
+          <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+          
+          <div class="space-y-2">
+            <label for="vps_expiry_date" class="block text-sm font-medium text-gray-300">VPS Expiry Date</label>
+            <div class="relative">
+              <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-gray-400">
+                <i class="ti ti-calendar"></i>
+              </span>
+              <input type="date" id="vps_expiry_date" name="vps_expiry_date"
+                class="bg-dark-900 text-white pl-10 pr-4 py-2 rounded-lg block w-full sm:max-w-md focus:outline-none focus:ring-1 focus:ring-primary"
+                value="<%= typeof vpsExpiryDate !== 'undefined' ? vpsExpiryDate : '' %>" required>
+            </div>
+            <p class="text-sm text-gray-400">Set the date when your VPS subscription will expire. A reminder banner will be shown on your dashboard.</p>
+          </div>
+          
+          <div class="pt-4">
+            <button type="submit"
+              class="px-4 py-2 bg-primary hover:bg-blue-600 text-white rounded-lg transition-colors">
+              Save Expiry Date
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
     <div id="about-tab" class="settings-content hidden">
       <div class="bg-gray-800 rounded-lg p-6 max-w-3xl">
         <h3 class="text-lg font-semibold mb-6">About StreamFlow</h3>
@@ -697,7 +731,7 @@
         });
       });
       const hashTab = window.location.hash.replace('#', '');
-      const validTabs = ['profile', 'security', 'integration', 'logs', 'about'];
+      const validTabs = ['profile', 'security', 'integration', 'vps', 'logs', 'about'];
       if (hashTab && validTabs.includes(hashTab)) {
         activateTab(hashTab);
       } else {

@@ -687,6 +687,18 @@ app.get('/dashboard', isAuthenticated, async (req, res) => {
       limit: 10,
       search: ''
     });
+
+    const AppSettings = require('./models/AppSettings');
+    const vpsExpiryDate = await AppSettings.get('vps_expiry_date') || '';
+    let vpsRemainingDays = null;
+    if (vpsExpiryDate) {
+      const expiry = new Date(vpsExpiryDate);
+      const today = new Date();
+      expiry.setHours(0,0,0,0);
+      today.setHours(0,0,0,0);
+      const diffTime = expiry - today;
+      vpsRemainingDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    }
     
     res.render('dashboard', {
       title: 'Dashboard',
@@ -699,7 +711,9 @@ app.get('/dashboard', isAuthenticated, async (req, res) => {
       youtubeSubscriberCount: defaultChannel?.subscriber_count || '0',
       hasYoutubeCredentials: hasYoutubeCredentials,
       initialStreams: JSON.stringify(initialStreamsData.streams),
-      initialPagination: JSON.stringify(initialStreamsData.pagination)
+      initialPagination: JSON.stringify(initialStreamsData.pagination),
+      vpsExpiryDate: vpsExpiryDate,
+      vpsRemainingDays: vpsRemainingDays
     });
   } catch (error) {
     console.error('Dashboard error:', error);
@@ -969,6 +983,7 @@ app.get('/settings', isAuthenticated, async (req, res) => {
     const defaultChannel = youtubeChannels.find(c => c.is_default) || youtubeChannels[0];
     
     const recaptchaSettings = await AppSettings.getRecaptchaSettings();
+    const vpsExpiryDate = await AppSettings.get('vps_expiry_date') || '';
     
     res.render('settings', {
       title: 'Settings',
@@ -988,6 +1003,7 @@ app.get('/settings', isAuthenticated, async (req, res) => {
       recaptchaSecretKey: recaptchaSettings.secretKey ? '••••••••••••••••' : '',
       hasRecaptchaKeys: recaptchaSettings.hasKeys,
       recaptchaEnabled: recaptchaSettings.enabled,
+      vpsExpiryDate: vpsExpiryDate,
       success: req.query.success || null,
       error: req.query.error || null,
       activeTab: req.query.activeTab || null
@@ -2370,6 +2386,24 @@ app.post('/api/settings/youtube-disconnect', isAuthenticated, async (req, res) =
       success: false,
       error: 'Failed to disconnect YouTube accounts'
     });
+  }
+});
+
+app.post('/api/settings/vps-expiry', isAuthenticated, async (req, res) => {
+  try {
+    const AppSettings = require('./models/AppSettings');
+    const { vps_expiry_date } = req.body;
+    
+    if (!vps_expiry_date) {
+      return res.redirect('/settings?error=VPS expiry date is required&activeTab=vps');
+    }
+    
+    await AppSettings.set('vps_expiry_date', vps_expiry_date);
+    
+    return res.redirect('/settings?success=VPS expiry date updated successfully&activeTab=vps');
+  } catch (error) {
+    console.error('Error saving VPS expiry date:', error);
+    return res.redirect('/settings?error=Failed to save VPS expiry date&activeTab=vps');
   }
 });
 
