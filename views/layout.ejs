@@ -176,6 +176,20 @@
     <div class="w-full lg:ml-20 flex flex-col min-h-screen">
       <div
         class="hidden lg:fixed lg:flex top-0 right-0 left-20 items-center justify-end h-14 px-6 bg-dark-800 shadow-md z-10">
+        <% if (typeof vpsExpiryDate !== 'undefined' && vpsExpiryDate && typeof vpsRemainingDays !== 'undefined' && vpsRemainingDays !== null) { %>
+          <a href="/settings#vps" class="flex items-center gap-1.5 px-3 py-1 rounded text-xs font-semibold mr-4 hover:opacity-80 transition-opacity <%= vpsRemainingDays < 0 ? 'bg-red-500/10 border border-red-500/20 text-red-400' : (vpsRemainingDays <= 3 ? 'bg-orange-500/10 border border-orange-500/20 text-orange-400' : (vpsRemainingDays <= 7 ? 'bg-yellow-500/10 border border-yellow-500/20 text-yellow-400' : 'bg-blue-500/10 border border-blue-500/20 text-blue-400')) %>">
+            <i class="ti ti-server"></i>
+            <span>
+              <% if (vpsRemainingDays < 0) { %>
+                VPS Expired
+              <% } else if (vpsRemainingDays === 0) { %>
+                VPS Expire Today
+              <% } else { %>
+                VPS: <%= vpsRemainingDays %> Hari
+              <% } %>
+            </span>
+          </a>
+        <% } %>
         <div id="server-time-display" class="flex items-center gap-1.5 text-gray-400 text-sm mr-4">
           <span id="server-date">--</span>
           <span class="text-gray-600">•</span>

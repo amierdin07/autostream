@@ -152,6 +152,24 @@ app.use(async (req, res, next) => {
       console.error('Error loading user:', error);
     }
   }
+  try {
+    const AppSettings = require('./models/AppSettings');
+    const vpsExpiryDate = await AppSettings.get('vps_expiry_date') || '';
+    let vpsRemainingDays = null;
+    if (vpsExpiryDate) {
+      const expiry = new Date(vpsExpiryDate);
+      const today = new Date();
+      expiry.setHours(0,0,0,0);
+      today.setHours(0,0,0,0);
+      const diffTime = expiry - today;
+      vpsRemainingDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    }
+    res.locals.vpsExpiryDate = vpsExpiryDate;
+    res.locals.vpsRemainingDays = vpsRemainingDays;
+  } catch (err) {
+    res.locals.vpsExpiryDate = '';
+    res.locals.vpsRemainingDays = null;
+  }
   res.locals.req = req;
   res.locals.appVersion = packageJson.version;
   next();
