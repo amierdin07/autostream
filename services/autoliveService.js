@@ -173,7 +173,7 @@ class AutoliveService {
       const isPastSession = now >= targetEnd;
       const isCurrentlyActive = now >= targetStart && now < targetEnd;
 
-      // A. Create local stream record 30 minutes in advance so it appears on the dashboard
+      // A. Create local stream record and sync to YouTube 30 minutes in advance (ONCE)
       const LOCAL_PREPARE_WINDOW = 30 * 60 * 1000; // 30 minutes
       if (!linkedStream && !isPastSession && timeToTarget <= LOCAL_PREPARE_WINDOW) {
         try {
@@ -184,7 +184,7 @@ class AutoliveService {
           const thumbnails = chosenSlot.thumbnails || [];
           const itemThumbnail = thumbnails[session.globalIndex % (thumbnails.length || 1)] || '';
           
-          console.log(`[Autolive] Creating local stream record for session ${targetStart.toISOString()} of "${series.name}" (30 mins before live)`);
+          console.log(`[Autolive] Preparing and syncing stream session ${targetStart.toISOString()} of "${series.name}" (30 mins before live)`);
           
           await this.getOrCreateStreamRecord(series, {
             title: itemTitle,
@@ -198,16 +198,17 @@ class AutoliveService {
           if (itemThumbnail) {
             await Stream.update(streamId, { youtube_thumbnail: itemThumbnail });
           }
+
+          // Trigger YouTube broadcast creation and configuration immediately
+          await this.syncToYouTube(series, targetStart, targetEnd);
+
         } catch (localCreateErr) {
-          console.error('[Autolive] Failed to create local stream record:', localCreateErr);
+          console.error('[Autolive] Failed to create and sync stream record:', localCreateErr);
         }
       }
 
-      // 1. If this session is currently active and the stream is not live yet, check/trigger scheduler to start it
+      // 1. If this session is currently active and the stream is not live yet, trigger scheduler to start it
       if (isCurrentlyActive && (!linkedStream || linkedStream.status === 'scheduled')) {
-        // Sync metadata to create the scheduled broadcast on YouTube
-        await this.syncToYouTube(series, targetStart, targetEnd);
-        
         const schedulerService = require('./schedulerService');
         schedulerService.checkScheduledStreams().catch(err => {
           console.error('[Autolive] Error triggering stream scheduler:', err);
@@ -218,24 +219,6 @@ class AutoliveService {
       if (linkedStream && linkedStream.status === 'live' && now >= targetEnd) {
         console.log(`[Autolive] Stopping live for series "${series.name}" session ${targetStart.toISOString()} (Duration reached)`);
         await this.stopAutoliveStream(series, targetStart);
-      }
-
-      // 3. Prepare future sessions (calling YouTube API)
-      const isFailedOrFinished = linkedStream && (linkedStream.status === 'offline' || linkedStream.status === 'done');
-      // Ensure we only prepare future sessions (timeToTarget >= 0)
-      const shouldPrepare = timeToTarget >= 0 && !isPastSession && !isFailedOrFinished && (timeToTarget <= PREPARE_WINDOW_MS || series.repeat_mode === 'nonstop');
-      if (shouldPrepare) {
-        const lastSync = series.last_metadata_update ? new Date(series.last_metadata_update).getTime() : 0;
-        const shouldSync = !linkedStream || (now.getTime() - lastSync > 30 * 60 * 1000) || (timeToTarget >= 0 && timeToTarget < 5 * 60 * 1000);
-        
-        if (shouldSync) {
-          console.log(`[Autolive] Preparing YouTube broadcast for session ${targetStart.toISOString()} of "${series.name}"...`);
-          await this.syncToYouTube(series, targetStart, targetEnd);
-          
-          await Autolive.update(series.id, {
-              last_metadata_update: now.toISOString()
-          });
-        }
       }
     }
   }
@@ -865,7 +848,6 @@ class AutoliveService {
       if (streams.length === 0) {
         return { success: true, skipped: true, message: 'Linked stream tasks have not been created yet' };
       }
-
       for (const stream of streams) {
         // Determine the correct item matching this stream's scheduled start (round-based)
         const upcoming = this.getUpcomingSchedule(series, items, 15);
