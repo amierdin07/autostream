@@ -160,7 +160,7 @@ class AutoliveService {
     const durationMs = (series.duration || 60) * 60 * 1000;
 
     // Get the upcoming schedule (next 5 runs) to process and prepare
-    const upcoming = this.getUpcomingSchedule(series, items, 5);
+    const upcoming = await this.getUpcomingSchedule(series, items, 5);
 
     for (const session of upcoming) {
       const targetStart = session.startTime;
@@ -184,7 +184,7 @@ class AutoliveService {
           const thumbnails = chosenSlot.thumbnails || [];
           const itemThumbnail = thumbnails[session.globalIndex % (thumbnails.length || 1)] || '';
           
-          console.log(`[Autolive] Preparing and syncing stream session ${targetStart.toISOString()} of "${series.name}" (30 mins before live)`);
+          console.log(`[Autolive] Preparing and syncing stream session ${targetStart.toISOString()} of "${series.name}" (globalIndex=${session.globalIndex}) (30 mins before live)`);
           
           await this.getOrCreateStreamRecord(series, {
             title: itemTitle,
@@ -199,7 +199,15 @@ class AutoliveService {
             await Stream.update(streamId, { youtube_thumbnail: itemThumbnail });
           }
 
+          // Increment current_item_index NOW so next slot always gets the next video
+          await Autolive.update(series.id, {
+            current_item_index: session.globalIndex + 1
+          });
+          console.log(`[Autolive] Locked index for "${series.name}": globalIndex ${session.globalIndex} → next will be ${session.globalIndex + 1}`);
+
           // Trigger YouTube broadcast creation and configuration immediately
+          // Reload series so syncToYouTube sees the updated current_item_index
+          series = await Autolive.findById(series.id) || series;
           await this.syncToYouTube(series, targetStart, targetEnd);
 
         } catch (localCreateErr) {
@@ -503,9 +511,16 @@ class AutoliveService {
       
       // Round-based rotation: determine which item and title to use
       const totalSessions = this.getTotalSessions(items);
-      let globalIndex = series.current_item_index || 0;
+      // Compute globalIndex directly from DB count of already-created streams for this series
+      let globalIndex = await new Promise((resolve) => {
+        db.get(
+          `SELECT COUNT(*) as cnt FROM streams WHERE id LIKE ? AND id NOT LIKE 'autolive_%_autolive_%'`,
+          [`autolive_${series.id}_%`],
+          (err, row) => resolve((row && row.cnt) || 0)
+        );
+      });
 
-      const upcoming = this.getUpcomingSchedule(series, items, 15);
+      const upcoming = await this.getUpcomingSchedule(series, items, 15);
       const matchingSession = upcoming.find(s => s.startTime.getTime() === scheduledStart.getTime());
 
       if (matchingSession) {
@@ -740,7 +755,7 @@ class AutoliveService {
           streamId = activeLiveId;
         } else {
           const items = await Autolive.getItemsBySeriesId(series.id);
-          const upcoming = this.getUpcomingSchedule(series, items, 1);
+          const upcoming = await this.getUpcomingSchedule(series, items, 1);
           if (upcoming.length > 0) {
             const ts = new Date(upcoming[0].startTime).getTime();
             streamId = `autolive_${series.id}_${ts}`;
@@ -850,7 +865,7 @@ class AutoliveService {
       }
       for (const stream of streams) {
         // Determine the correct item matching this stream's scheduled start (round-based)
-        const upcoming = this.getUpcomingSchedule(series, items, 15);
+        const upcoming = await this.getUpcomingSchedule(series, items, 15);
         const streamStart = stream.schedule_time ? new Date(stream.schedule_time) : new Date(series.start_time);
         const matchingSession = upcoming.find(s => s.startTime.getTime() === streamStart.getTime());
         
@@ -966,7 +981,7 @@ class AutoliveService {
     };
   }
 
-  static getUpcomingSchedule(series, items, count = 5) {
+  static async getUpcomingSchedule(series, items, count = 5) {
     if (!items || items.length === 0) return [];
     
     const schedule = [];
@@ -976,7 +991,16 @@ class AutoliveService {
     const totalSessions = this.getTotalSessions(items);
     
     let currentStart = this.getCurrentSessionStart(series, series.repeat_mode, now, timeZone);
-    let globalIndex = series.current_item_index || 0;
+    
+    // Determine starting globalIndex from the count of already-created stream records in DB.
+    // This is the only reliable source: immune to drift, race conditions, and restarts.
+    let globalIndex = await new Promise((resolve) => {
+      db.get(
+        `SELECT COUNT(*) as cnt FROM streams WHERE id LIKE ? AND id NOT LIKE 'autolive_%_autolive_%'`,
+        [`autolive_${series.id}_%`],
+        (err, row) => resolve((row && row.cnt) || 0)
+      );
+    });
     
     // If the current session is already in the past (finished), move to next
     if (new Date(currentStart.getTime() + durationMs) < now) {
