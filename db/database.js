@@ -387,6 +387,7 @@ function createTables() {
         subscriber_count TEXT DEFAULT '0',
         access_token TEXT,
         refresh_token TEXT,
+        token_expiry INTEGER,
         is_default INTEGER DEFAULT 0,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -412,6 +413,12 @@ function createTables() {
       db.run(`ALTER TABLE videos ADD COLUMN folder_id TEXT`, (err) => {
         if (err && !err.message.includes('duplicate column name')) {
           console.error('Error adding folder_id column to videos:', err.message);
+        }
+      });
+
+      db.run(`ALTER TABLE youtube_channels ADD COLUMN token_expiry INTEGER`, (err) => {
+        if (err && !err.message.includes('duplicate column name')) {
+          console.error('Error adding token_expiry column to youtube_channels:', err.message);
         }
       });
 
@@ -472,6 +479,24 @@ function createTables() {
         }
       });
 
+      db.run(`ALTER TABLE youtube_channels ADD COLUMN default_description TEXT`, (err) => {
+        if (err && !err.message.includes('duplicate column name')) {
+          console.error('Error adding default_description to youtube_channels:', err.message);
+        }
+      });
+
+      db.run(`ALTER TABLE youtube_channels ADD COLUMN default_tags TEXT`, (err) => {
+        if (err && !err.message.includes('duplicate column name')) {
+          console.error('Error adding default_tags to youtube_channels:', err.message);
+        }
+      });
+
+      db.run(`ALTER TABLE youtube_channels ADD COLUMN default_category TEXT DEFAULT '22'`, (err) => {
+        if (err && !err.message.includes('duplicate column name')) {
+          console.error('Error adding default_category to youtube_channels:', err.message);
+        }
+      });
+
       db.run(`CREATE TABLE IF NOT EXISTS autolive_series (
         id TEXT PRIMARY KEY,
         user_id TEXT NOT NULL,
@@ -525,6 +550,17 @@ function createTables() {
         FOREIGN KEY (series_id) REFERENCES autolive_series(id) ON DELETE CASCADE
       )`);
 
+      db.run(`CREATE TABLE IF NOT EXISTS user_notes (
+        id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL,
+        title TEXT NOT NULL,
+        content TEXT NOT NULL,
+        category TEXT DEFAULT 'general',
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+      )`);
+
       db.run(`CREATE TABLE IF NOT EXISTS app_settings (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         setting_key TEXT UNIQUE NOT NULL,
@@ -535,7 +571,46 @@ function createTables() {
         if (err && !err.message.includes('already exists')) {
           console.error('Error creating app_settings table:', err.message);
         }
-        resolve();
+      });
+
+      db.run(`CREATE TABLE IF NOT EXISTS regular_uploads (
+        id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL,
+        youtube_channel_id TEXT NOT NULL,
+        video_id TEXT,
+        video_path TEXT NOT NULL,
+        video_title TEXT,
+        title TEXT NOT NULL,
+        description TEXT,
+        tags TEXT,
+        category_id TEXT DEFAULT '22',
+        privacy_status TEXT DEFAULT 'public',
+        made_for_kids INTEGER DEFAULT 0,
+        thumbnail_path TEXT,
+        scheduled_publish_at TEXT,
+        schedule_mode TEXT DEFAULT 'youtube',
+        delete_after_upload INTEGER DEFAULT 1,
+        playlist_id TEXT,
+        youtube_video_id TEXT,
+        status TEXT DEFAULT 'pending',
+        progress INTEGER DEFAULT 0,
+        error_message TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        completed_at DATETIME,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+        FOREIGN KEY (video_id) REFERENCES videos(id) ON DELETE SET NULL,
+        FOREIGN KEY (youtube_channel_id) REFERENCES youtube_channels(id) ON DELETE SET NULL
+      )`, (err) => {
+        if (err && !err.message.includes('already exists')) {
+          console.error('Error creating regular_uploads table:', err.message);
+        }
+
+        db.run(`ALTER TABLE regular_uploads ADD COLUMN schedule_mode TEXT DEFAULT 'youtube'`, () => {
+          db.run(`ALTER TABLE regular_uploads ADD COLUMN delete_after_upload INTEGER DEFAULT 1`, () => {
+            resolve();
+          });
+        });
       });
     });
   });

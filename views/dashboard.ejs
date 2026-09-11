@@ -225,24 +225,24 @@
         <table class="min-w-full">
           <thead class="bg-gray-700 sticky top-0 z-9">
             <tr>
-              <th class="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+              <th class="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider w-10">
                 <input type="checkbox" id="select-all-streams" class="w-4 h-4 rounded border-gray-600 bg-dark-800 text-primary focus:ring-primary" title="Select all visible streams" onchange="toggleAllVisibleStreams(this.checked)">
               </th>
-              <th class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Stream Name
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider w-full min-w-[240px]">Stream Name
               </th>
               <% if (typeof youtubeConnected !== 'undefined' && youtubeConnected) { %>
-              <th class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+              <th class="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider w-40 whitespace-nowrap">
                 <button onclick="toggleChannelVisibility()" class="flex items-center gap-1.5 hover:text-white transition-colors group" title="Toggle Channel Visibility">
                   <span class="uppercase tracking-wider">Channel</span>
                   <i id="channel-visibility-icon" class="ti ti-eye text-sm"></i>
                 </button>
               </th>
-              <th class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Dashboard</th>
+              <th class="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider w-28 whitespace-nowrap">Dashboard</th>
               <% } %>
-              <th class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Platform</th>
-              <th class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Schedule</th>
-              <th class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Status</th>
-              <th class="px-6 py-3 text-right text-xs font-medium text-gray-300 uppercase tracking-wider">Actions</th>
+              <th class="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider w-28 whitespace-nowrap">Platform</th>
+              <th class="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider w-44 whitespace-nowrap">Schedule</th>
+              <th class="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider w-40 whitespace-nowrap">Status</th>
+              <th class="px-4 py-3 text-right text-xs font-medium text-gray-300 uppercase tracking-wider w-32 whitespace-nowrap">Actions</th>
             </tr>
           </thead>
           <tbody class="divide-y divide-gray-700">
@@ -1834,13 +1834,13 @@
             
             const totalUpload = document.getElementById('total-upload');
             const totalDownload = document.getElementById('total-download');
-            if (totalUpload) totalUpload.textContent = '↑ ' + data.network.totalUploadFormatted;
-            if (totalDownload) totalDownload.textContent = '↓ ' + data.network.totalDownloadFormatted;
+            if (totalUpload) totalUpload.textContent = '↑ ' + (data.network.totalUploadFormatted || '0 B');
+            if (totalDownload) totalDownload.textContent = '↓ ' + (data.network.totalDownloadFormatted || '0 B');
             
             const totalUploadWide = document.getElementById('total-upload-wide');
             const totalDownloadWide = document.getElementById('total-download-wide');
-            if (totalUploadWide) totalUploadWide.textContent = '↑ ' + data.network.totalUploadFormatted;
-            if (totalDownloadWide) totalDownloadWide.textContent = '↓ ' + data.network.totalDownloadFormatted;
+            if (totalUploadWide) totalUploadWide.textContent = '↑ ' + (data.network.totalUploadFormatted || '0 B');
+            if (totalDownloadWide) totalDownloadWide.textContent = '↓ ' + (data.network.totalDownloadFormatted || '0 B');
           }         
           if (data.disk) {
             const diskUsagePercent = data.disk.usagePercent;
@@ -2029,6 +2029,14 @@
         if (enableSchedule) {
           const scheduleStart = document.getElementById('ytScheduleStart').value;
           const scheduleEnd = document.getElementById('ytScheduleEnd').value;
+          if (scheduleEnd) {
+            const endDate = new Date(scheduleEnd);
+            const startDate = scheduleStart ? new Date(scheduleStart) : new Date();
+            if (endDate <= startDate) {
+              showToast('error', 'End time must be after start time.');
+              return;
+            }
+          }
           if (scheduleStart) ytFormData.scheduleStartTime = scheduleStart;
           if (scheduleEnd) ytFormData.scheduleEndTime = scheduleEnd;
         }
@@ -2719,7 +2727,7 @@
       }
       const canSelectStream = stream.status !== 'live';
       row.innerHTML = `
-      <td class="px-4 py-4 whitespace-nowrap">
+      <td class="px-4 py-4 whitespace-nowrap w-10">
         <input type="checkbox"
                class="stream-select-checkbox w-4 h-4 rounded border-gray-600 bg-dark-900 text-primary focus:ring-primary ${canSelectStream ? '' : 'opacity-40 cursor-not-allowed'}"
                value="${stream.id}"
@@ -2728,16 +2736,16 @@
                title="${canSelectStream ? 'Select stream' : 'Live streams cannot be bulk deleted'}"
                onchange="toggleStreamSelection('${stream.id}', this.checked)">
       </td>
-      <td class="px-6 py-4 whitespace-nowrap">
+      <td class="px-6 py-4">
         <div class="flex items-center">
           <div class="w-20 h-12 bg-dark-700 rounded flex-shrink-0 overflow-hidden mr-3">
             <img src="${thumbnail}" class="w-full h-full object-cover" alt="${stream.title}">
           </div>
           <div class="min-w-0 flex-1">
             ${getSourceBadgeHTML(stream.id)}
-            ${stream.video_type ? `<div class="text-sm font-semibold truncate max-w-[200px]" title="${stream.video_type === 'playlist' ? stream.playlist_name : stream.video_title}">${stream.video_type === 'playlist' ? '<i class="ti ti-list text-[11px] text-primary mr-1"></i>' + stream.playlist_name : '<i class="ti ti-video text-[11px] text-primary mr-1"></i>' + stream.video_title}</div>` : `<div class="text-sm font-medium truncate max-w-[200px]" title="${stream.title}">${stream.title}</div>`}
+            ${stream.video_type ? `<div class="text-sm font-semibold truncate max-w-[320px]" title="${stream.video_type === 'playlist' ? stream.playlist_name : stream.video_title}">${stream.video_type === 'playlist' ? '<i class="ti ti-list text-[11px] text-primary mr-1"></i>' + stream.playlist_name : '<i class="ti ti-video text-[11px] text-primary mr-1"></i>' + stream.video_title}</div>` : `<div class="text-sm font-medium truncate max-w-[320px]" title="${stream.title}">${stream.title}</div>`}
             ${autoliveNameHTML}
-            ${stream.video_type ? `<div class="text-[11px] text-gray-400 truncate max-w-[200px]">${stream.title}</div>` : ''}
+            ${stream.video_type ? `<div class="text-[11px] text-gray-400 truncate max-w-[320px]">${stream.title}</div>` : ''}
             <div class="text-xs text-gray-400 stream-settings-display flex items-center gap-1.5 mt-0.5 flex-wrap">
               <span>${settingsDisplay}</span>
               ${autoDeleteBadgeHTML}
@@ -2746,7 +2754,7 @@
         </div>
       </td>
       ${youtubeConnected ? `
-      <td class="px-6 py-4 whitespace-nowrap channel-column-cell ${isChannelHidden ? 'hide-content' : ''}">
+      <td class="px-4 py-4 whitespace-nowrap w-40 channel-column-cell ${isChannelHidden ? 'hide-content' : ''}">
         ${stream.youtube_channel_name && stream.youtube_channel_external_id ? `
         <a href="https://www.youtube.com/channel/${stream.youtube_channel_external_id}" 
            target="_blank" 
@@ -2764,7 +2772,7 @@
         </a>
         ` : '<span class="text-gray-500 text-xs">—</span>'}
       </td>
-      <td class="px-6 py-4 whitespace-nowrap">
+      <td class="px-4 py-4 whitespace-nowrap w-28">
         ${stream.youtube_broadcast_id ? `
         <a href="https://studio.youtube.com/video/${stream.youtube_broadcast_id}/livestreaming" 
            target="_blank" 
@@ -2786,13 +2794,13 @@
         ` : '<span class="text-gray-500 text-xs">—</span>'}
       </td>
       ` : ''}
-      <td class="px-6 py-4 whitespace-nowrap">
+      <td class="px-4 py-4 whitespace-nowrap w-28">
         <div class="flex items-center">
           <i class="ti ti-brand-${getPlatformIcon(stream.platform)} text-${getPlatformColor(stream.platform)} mr-1.5"></i>
           <span class="text-sm">${stream.platform || 'Custom'}</span>
         </div>
       </td>
-      <td class="px-6 py-4 whitespace-nowrap">
+      <td class="px-4 py-4 whitespace-nowrap w-44">
         ${(() => {
           const endDate = stream.end_time ? new Date(stream.end_time) : null;
           if (scheduleDate && endDate) {
@@ -2807,12 +2815,13 @@
           }
         })()}
       </td>
-      <td class="px-6 py-4 whitespace-nowrap min-w-[150px]">
+      <td class="px-4 py-4 whitespace-nowrap w-40">
         <div class="flex flex-col items-start">
           ${statusBadge}
           ${getStopReasonHTML(stream)}
+        </div>
       </td>
-      <td class="px-6 py-4 whitespace-nowrap text-right">
+      <td class="px-4 py-4 whitespace-nowrap text-right w-32">
         <div class="flex items-center justify-end space-x-2">
           ${getActionButtonHTML(stream.status, stream.id, 'desktop')}
           <div class="ml-2 flex items-center gap-1">
@@ -4424,13 +4433,11 @@
     
     function formatDateTimeLocal(date) {
       if (!date || isNaN(date.getTime())) return '';
-      const serverDate = convertFromServerTime(date.toISOString());
-      if (!serverDate) return '';
-      const year = serverDate.getFullYear();
-      const month = String(serverDate.getMonth() + 1).padStart(2, '0');
-      const day = String(serverDate.getDate()).padStart(2, '0');
-      const hours = String(serverDate.getHours()).padStart(2, '0');
-      const minutes = String(serverDate.getMinutes()).padStart(2, '0');
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      const hours = String(date.getHours()).padStart(2, '0');
+      const minutes = String(date.getMinutes()).padStart(2, '0');
       return `${year}-${month}-${day}T${hours}:${minutes}`;
     }
     function closeEditStreamModal() {
@@ -5153,21 +5160,21 @@
       
       if (!startInput || !endInput || !hoursInput || !minutesInput) return;
       
-      const hours = parseInt(hoursInput.value) || 0;
-      const minutes = parseInt(minutesInput.value) || 0;
+      const hours = parseInt(hoursInput.value, 10) || 0;
+      const minutes = parseInt(minutesInput.value, 10) || 0;
       
       if (hours === 0 && minutes === 0) return;
       
-      let startDateStr = startInput.value;
       let startDate;
-      
-      if (startDateStr) {
-        startDate = new Date(startDateStr);
+      if (startInput.value) {
+        startDate = new Date(startInput.value);
+        if (isNaN(startDate.getTime())) {
+          startDate = new Date();
+          startInput.value = formatDateTimeLocal(startDate);
+        }
       } else {
         startDate = new Date();
-        const offset = startDate.getTimezoneOffset();
-        startDate = new Date(startDate.getTime() - (offset*60*1000));
-        startInput.value = startDate.toISOString().slice(0,16);
+        startInput.value = formatDateTimeLocal(startDate);
       }
       
       const endDate = new Date(startDate.getTime() + ((hours * 60) + minutes) * 60000);

@@ -1084,12 +1084,21 @@ async function startStream(streamId, isRetry = false, baseUrl = null) {
       try {
         const ytResult = await youtubeService.createYouTubeBroadcast(streamId, effectiveBaseUrl);
         if (!ytResult.success) {
+          if (ytResult.isCompleted) {
+            addStreamLog(streamId, `YouTube broadcast lifecycle is ended (${ytResult.lifecycleStatus}). Transitioning stream to done.`);
+            await transitionStreamToDone(streamId, stream.user_id, buildStopOptions('youtube_ended', ytResult.error));
+            cleanupStreamData(streamId);
+            return { success: false, isCompleted: true, error: ytResult.error };
+          }
           addStreamLog(streamId, `YouTube broadcast failed: ${ytResult.error}`);
           throw new Error(ytResult.error || 'Failed to create YouTube broadcast');
         }
         stream = await Stream.findById(streamId);
         addStreamLog(streamId, `YouTube broadcast created: ${ytResult.broadcastId}`);
       } catch (ytError) {
+        if (ytError && ytError.isCompleted) {
+          return { success: false, isCompleted: true, error: ytError.error || ytError.message };
+        }
         const betterError = youtubeService.handleYoutubeError(ytError, `(Stream: ${stream.title})`);
         addStreamLog(streamId, `YouTube API error: ${betterError.message}`);
         throw betterError;

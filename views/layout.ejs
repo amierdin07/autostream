@@ -56,6 +56,7 @@
     }
   </script>
   <script src="/js/stream-modal.js" defer></script>
+  <script src="/js/quick-notes.js" defer></script>
   <script>
      if ('serviceWorker' in navigator) {
        window.addEventListener('load', function() {
@@ -87,6 +88,10 @@
          class="p-2 text-gray-400 hover:text-white transition-colors">
         <i class="ti ti-gift text-lg"></i>
       </a>
+      <button id="mobile-quick-notes-btn" onclick="toggleQuickNotesDrawer()" 
+         class="p-2 text-yellow-400 hover:text-yellow-300 transition-colors" title="Catatan & SEO Snippets">
+        <i class="ti ti-notes text-lg"></i>
+      </button>
       <div class="relative">
         <button id="mobile-notification-btn" class="p-2 text-gray-400 hover:text-white transition-colors relative">
           <i class="ti ti-bell text-lg"></i>
@@ -115,6 +120,11 @@
           <i class="ti ti-bolt text-xl"></i>
           <span class="text-xs mt-1">Autolive</span>
           <span class="sidebar-tooltip group-hover:scale-100">Automated Recurring Live</span>
+        </a>
+        <a href="/reguler" class="sidebar-icon group <%= active === 'reguler' ? 'bg-primary' : '' %>">
+          <i class="ti ti-upload text-xl"></i>
+          <span class="text-xs mt-1">Reguler</span>
+          <span class="sidebar-tooltip group-hover:scale-100">Upload Video Reguler</span>
         </a>
         <a href="/gallery" class="sidebar-icon group <%= active === 'gallery' ? 'bg-primary' : '' %>">
           <i class="ti ti-video text-xl"></i>
@@ -196,6 +206,12 @@
           <span id="server-clock" class="tabular-nums">--:--:--</span>
         </div>
         <div class="h-4 w-px bg-gray-600 mr-4"></div>
+        <button id="quick-notes-btn" onclick="toggleQuickNotesDrawer()"
+          class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-dark-700 hover:bg-dark-600 border border-gray-700 hover:border-gray-600 text-gray-200 hover:text-white transition-all text-xs font-medium mr-2 group shadow-sm active:scale-95 cursor-pointer"
+          title="Catatan & SEO Snippets">
+          <i class="ti ti-notes text-base text-yellow-400 group-hover:scale-110 transition-transform"></i>
+          <span>Notes</span>
+        </button>
         <a href="https://github.com/bangtutorial/streamflow" target="_blank"
           class="p-2 text-gray-400 hover:text-white transition-colors mr-2">
           <i class="ti ti-brand-github text-lg"></i>
@@ -253,6 +269,10 @@
       <a href="/autolive" class="bottom-nav-item <%= active === 'autolive' ? 'bottom-nav-active' : '' %>">
         <i class="ti ti-bolt"></i>
         <span>Autolive</span>
+      </a>
+      <a href="/reguler" class="bottom-nav-item <%= active === 'reguler' ? 'bottom-nav-active' : '' %>">
+        <i class="ti ti-upload"></i>
+        <span>Reguler</span>
       </a>
       <a href="/gallery" class="bottom-nav-item <%= active === 'gallery' ? 'bottom-nav-active' : '' %>">
         <i class="ti ti-video"></i>
@@ -885,3 +905,164 @@
     }
   });
 </script>
+
+  <!-- Quick Notes & SEO Snippets Drawer -->
+  <div id="quick-notes-backdrop" onclick="closeQuickNotesDrawer()"
+    class="fixed inset-0 bg-black/60 backdrop-blur-sm z-[70] transition-opacity duration-300 opacity-0 hidden"></div>
+
+  <div id="quick-notes-drawer"
+    class="fixed inset-y-0 right-0 z-[75] w-full sm:w-[480px] md:w-[520px] bg-dark-800 border-l border-gray-700/80 shadow-2xl transform translate-x-full transition-transform duration-300 ease-in-out flex flex-col">
+    
+    <!-- Drawer Header -->
+    <div class="p-4 sm:p-5 border-b border-gray-700/70 bg-dark-900/60 flex items-center justify-between flex-shrink-0">
+      <div class="flex items-center gap-2.5">
+        <div class="w-9 h-9 rounded-lg bg-yellow-400/10 border border-yellow-400/20 flex items-center justify-center text-yellow-400">
+          <i class="ti ti-notes text-xl"></i>
+        </div>
+        <div>
+          <h3 class="font-bold text-base text-white flex items-center gap-2">
+            Catatan & SEO
+            <span id="quick-notes-total-badge" class="text-[11px] font-normal px-2 py-0.5 rounded-full bg-dark-700 text-gray-300 border border-gray-600">0 Catatan</span>
+          </h3>
+          <p class="text-xs text-gray-400">Simpan deskripsi, tags, dan catatan live stream</p>
+        </div>
+      </div>
+      <div class="flex items-center gap-2">
+        <button type="button" onclick="toggleNoteForm(true)"
+          class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary hover:bg-primary/90 text-white text-xs font-semibold shadow-md active:scale-95 transition-all">
+          <i class="ti ti-plus"></i>
+          <span>Tambah</span>
+        </button>
+        <button type="button" onclick="closeQuickNotesDrawer()"
+          class="p-2 rounded-lg text-gray-400 hover:text-white hover:bg-dark-700 transition-colors">
+          <i class="ti ti-x text-lg"></i>
+        </button>
+      </div>
+    </div>
+
+    <!-- Drawer Content Area -->
+    <div class="flex-1 overflow-y-auto p-4 sm:p-5 space-y-4 custom-scrollbar">
+      
+      <!-- Create / Edit Note Form -->
+      <div id="quick-notes-form-container" class="hidden bg-dark-900/90 border border-primary/40 rounded-xl p-4 sm:p-5 space-y-4 shadow-lg">
+        <div class="flex items-center justify-between border-b border-gray-800 pb-3">
+          <h4 id="note-form-header-title" class="font-semibold text-sm text-white flex items-center gap-2">
+            <i class="ti ti-pencil text-primary"></i> Tambah Catatan Baru
+          </h4>
+          <button type="button" onclick="toggleNoteForm(false)" class="text-gray-400 hover:text-white text-xs flex items-center gap-1">
+            <i class="ti ti-x"></i> Batal
+          </button>
+        </div>
+
+        <form onsubmit="saveQuickNote(event)" class="space-y-3.5">
+          <input type="hidden" id="note-form-id" value="">
+
+          <div>
+            <label class="block text-xs font-medium text-gray-300 mb-1">Judul Catatan / Preset</label>
+            <input type="text" id="note-form-title" required placeholder="Contoh: Deskripsi Musik Chill 24/7"
+              class="w-full bg-dark-800 border border-gray-700 rounded-lg px-3.5 py-2 text-sm text-white focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary placeholder-gray-500">
+          </div>
+
+          <div>
+            <label class="block text-xs font-medium text-gray-300 mb-1">Kategori</label>
+            <select id="note-form-category"
+              class="w-full bg-dark-800 border border-gray-700 rounded-lg px-3.5 py-2 text-sm text-white focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary">
+              <option value="general">📄 Umum / Catatan Biasa</option>
+              <option value="description">📝 Deskripsi YouTube</option>
+              <option value="tags">🏷️ Tags YouTube (Koma dipisah)</option>
+              <option value="title">📌 Template Judul</option>
+            </select>
+          </div>
+
+          <div>
+            <div class="flex items-center justify-between mb-1">
+              <label class="block text-xs font-medium text-gray-300">Isi Catatan</label>
+              <span id="note-form-char-count" class="text-xs text-gray-400">0 karakter</span>
+            </div>
+            <textarea id="note-form-content" required rows="6" placeholder="Tulis atau paste teks catatan/SEO di sini..."
+              class="w-full bg-dark-800 border border-gray-700 rounded-lg p-3 text-sm text-white focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary placeholder-gray-500 font-mono resize-y leading-relaxed"></textarea>
+          </div>
+
+          <div class="flex items-center justify-end gap-2 pt-2">
+            <button type="button" onclick="toggleNoteForm(false)"
+              class="px-4 py-2 rounded-lg bg-dark-700 hover:bg-dark-600 text-gray-300 text-xs font-medium transition-colors">
+              Batal
+            </button>
+            <button type="submit" id="note-form-save-btn"
+              class="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-primary hover:bg-primary/90 text-white text-xs font-semibold shadow-md active:scale-95 transition-all">
+              <i class="ti ti-check"></i>
+              <span>Simpan Catatan</span>
+            </button>
+          </div>
+        </form>
+      </div>
+
+      <!-- Notes List Container -->
+      <div id="quick-notes-list-container" class="space-y-3.5">
+        
+        <!-- Search & Filter Controls -->
+        <div class="space-y-2.5">
+          <div class="relative">
+            <i class="ti ti-search absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm"></i>
+            <input type="text" id="quick-notes-search" placeholder="Cari catatan atau tag..."
+              class="w-full bg-dark-900 border border-gray-700/80 rounded-lg pl-9 pr-3.5 py-2 text-xs text-white focus:outline-none focus:border-primary placeholder-gray-500">
+          </div>
+
+          <!-- Category Filter Pills -->
+          <div class="flex items-center gap-1.5 overflow-x-auto pb-1 custom-scrollbar text-xs">
+            <button type="button" data-category="all"
+              class="notes-category-pill px-3 py-1 rounded-lg bg-primary text-white border border-primary font-medium flex-shrink-0 transition-colors">
+              Semua
+            </button>
+            <button type="button" data-category="description"
+              class="notes-category-pill px-3 py-1 rounded-lg bg-dark-700 text-gray-400 border border-gray-700 hover:text-white font-medium flex-shrink-0 transition-colors">
+              Deskripsi
+            </button>
+            <button type="button" data-category="tags"
+              class="notes-category-pill px-3 py-1 rounded-lg bg-dark-700 text-gray-400 border border-gray-700 hover:text-white font-medium flex-shrink-0 transition-colors">
+              Tags
+            </button>
+            <button type="button" data-category="title"
+              class="notes-category-pill px-3 py-1 rounded-lg bg-dark-700 text-gray-400 border border-gray-700 hover:text-white font-medium flex-shrink-0 transition-colors">
+              Judul
+            </button>
+            <button type="button" data-category="general"
+              class="notes-category-pill px-3 py-1 rounded-lg bg-dark-700 text-gray-400 border border-gray-700 hover:text-white font-medium flex-shrink-0 transition-colors">
+              Umum
+            </button>
+          </div>
+        </div>
+
+        <!-- Notes Cards List -->
+        <div id="quick-notes-cards" class="space-y-3">
+          <!-- Populated dynamically by quick-notes.js -->
+        </div>
+
+        <!-- Empty State -->
+        <div id="quick-notes-empty" class="hidden text-center py-12 px-4">
+          <div class="w-14 h-14 rounded-2xl bg-dark-700/60 border border-gray-700 flex items-center justify-center mx-auto mb-3 text-gray-400">
+            <i class="ti ti-notes-off text-2xl"></i>
+          </div>
+          <h4 class="text-white text-sm font-semibold mb-1">Belum Ada Catatan</h4>
+          <p class="text-xs text-gray-400 mb-4">Simpan template deskripsi, daftar tags, atau catatan live stream kamu di sini.</p>
+          <button type="button" onclick="toggleNoteForm(true)"
+            class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-primary hover:bg-primary/90 text-white text-xs font-semibold shadow-md active:scale-95 transition-all">
+            <i class="ti ti-plus"></i>
+            <span>Buat Catatan Pertama</span>
+          </button>
+        </div>
+
+      </div>
+
+    </div>
+
+    <!-- Drawer Footer -->
+    <div class="p-3.5 border-t border-gray-700/70 bg-dark-900/60 flex items-center justify-between text-xs text-gray-400 flex-shrink-0">
+      <span class="flex items-center gap-1.5">
+        <i class="ti ti-info-circle text-gray-400"></i>
+        <span>Tersimpan otomatis ke database</span>
+      </span>
+      <span class="text-[11px] text-gray-400">Tekan <kbd class="px-1.5 py-0.5 rounded bg-dark-700 border border-gray-600 text-[10px]">ESC</kbd> untuk menutup</span>
+    </div>
+  </div>
+

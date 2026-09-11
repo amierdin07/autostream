@@ -248,8 +248,22 @@ async function createYouTubeBroadcast(streamId, baseUrl) {
 
   if (broadcastId && rtmpUrl && streamKey) {
       if (!loggedAlreadyHasBroadcast.has(streamId)) {
-          console.log(`[YouTubeService] Stream ${streamId} already has broadcast ${broadcastId}. Reusing.`);
+          console.log(`[YouTubeService] Stream ${streamId} already has broadcast ${broadcastId}. Checking status...`);
           loggedAlreadyHasBroadcast.add(streamId);
+      }
+      try {
+          const lifecycleStatus = await getBroadcastLifecycleStatus(stream.user_id, stream.youtube_channel_id, broadcastId);
+          if (lifecycleStatus && ['complete', 'revoked', 'ended'].includes(lifecycleStatus.toLowerCase())) {
+              console.log(`[YouTubeService] Stream ${streamId} broadcast ${broadcastId} lifecycle is ${lifecycleStatus}. Cannot reuse.`);
+              return {
+                  success: false,
+                  isCompleted: true,
+                  lifecycleStatus: lifecycleStatus,
+                  error: `YouTube broadcast ${broadcastId} sudah selesai/di-stop di YouTube (status: ${lifecycleStatus}).`
+              };
+          }
+      } catch (checkErr) {
+          console.warn(`[YouTubeService] Failed to check broadcast lifecycle status for ${broadcastId}:`, checkErr.message);
       }
   }
   
@@ -455,22 +469,43 @@ async function createYouTubeBroadcast(streamId, baseUrl) {
     const rtmpStreams = existingStreams.filter(s => s.cdn && s.cdn.ingestionType === 'rtmp');
 
     if (rtmpStreams.length > 0) {
-      // Deterministic selection based on streamId hash to avoid duplicates in concurrent runs
-      const getHash = (str) => {
-        let hash = 0;
-        for (let i = 0; i < str.length; i++) {
-          hash = str.charCodeAt(i) + ((hash << 5) - hash);
-        }
-        return Math.abs(hash);
-      };
-      const selectedIndex = getHash(streamId) % rtmpStreams.length;
-      const liveStream = rtmpStreams[selectedIndex];
-      
-      youtubeStreamId = liveStream.id;
-      rtmpUrl = liveStream.cdn.ingestionInfo.ingestionAddress;
-      streamKey = liveStream.cdn.ingestionInfo.streamName;
-      console.log(`[YouTubeService] Reusing existing live stream key (Index ${selectedIndex}): ${youtubeStreamId}`);
-    } else {
+      // Get all stream keys currently in use by OTHER live/scheduled streams in the DB
+      const { db } = require('../db/database');
+      const usedStreamIds = await new Promise((resolve) => {
+        db.all(
+          `SELECT youtube_stream_id FROM streams 
+           WHERE youtube_stream_id IS NOT NULL AND youtube_stream_id != '' 
+           AND id != ? AND status IN ('live', 'scheduled')`,
+          [streamId],
+          (err, rows) => resolve(err ? [] : (rows || []).map(r => r.youtube_stream_id))
+        );
+      });
+
+      // Filter out stream keys already used by other concurrent streams
+      const availableStreams = rtmpStreams.filter(s => !usedStreamIds.includes(s.id));
+
+      if (availableStreams.length > 0) {
+        // Deterministic selection based on streamId hash to avoid duplicates in concurrent runs
+        const getHash = (str) => {
+          let hash = 0;
+          for (let i = 0; i < str.length; i++) {
+            hash = str.charCodeAt(i) + ((hash << 5) - hash);
+          }
+          return Math.abs(hash);
+        };
+        const selectedIndex = getHash(streamId) % availableStreams.length;
+        const liveStream = availableStreams[selectedIndex];
+        
+        youtubeStreamId = liveStream.id;
+        rtmpUrl = liveStream.cdn.ingestionInfo.ingestionAddress;
+        streamKey = liveStream.cdn.ingestionInfo.streamName;
+        console.log(`[YouTubeService] Reusing existing live stream key (Index ${selectedIndex}, from pool of ${availableStreams.length} available): ${youtubeStreamId}`);
+      } else {
+        console.log(`[YouTubeService] All existing (${rtmpStreams.length}) stream keys are currently in use by other streams. Creating a new separate stream key dynamically...`);
+      }
+    }
+
+    if (!youtubeStreamId || !rtmpUrl || !streamKey) {
       const streamResponse = await youtube.liveStreams.insert({
           part: 'snippet,cdn,contentDetails,status',
           requestBody: {
@@ -584,23 +619,69 @@ async function createYouTubeBroadcast(streamId, baseUrl) {
 async function getYoutubeInstance(userId, channelId) {
   const user = await User.findById(userId);
   const selectedChannel = await YoutubeChannel.findById(channelId);
-  if (!user || !selectedChannel || !selectedChannel.access_token) return null;
+  if (!user || !selectedChannel || (!selectedChannel.access_token && !selectedChannel.refresh_token)) return null;
   
   // Use channel-specific client credentials if available, otherwise fall back to user-wide credentials
   const clientId = selectedChannel.youtube_client_id || user.youtube_client_id;
   const clientSecretEncrypted = selectedChannel.youtube_client_secret || user.youtube_client_secret;
   
   const clientSecret = decrypt(clientSecretEncrypted);
-  const accessToken = decrypt(selectedChannel.access_token);
-  const refreshToken = decrypt(selectedChannel.refresh_token);
+  const accessToken = selectedChannel.access_token ? decrypt(selectedChannel.access_token) : null;
+  const refreshToken = selectedChannel.refresh_token ? decrypt(selectedChannel.refresh_token) : null;
   
   const baseUrl = process.env.BASE_URL || 'http://localhost:7575';
   const oauth2Client = getYouTubeOAuth2Client(clientId, clientSecret, baseUrl);
+
   oauth2Client.setCredentials({
-    access_token: accessToken,
-    refresh_token: refreshToken
+    access_token: accessToken || undefined,
+    refresh_token: refreshToken || undefined,
+    expiry_date: selectedChannel.token_expiry || undefined
   });
-  
+
+  oauth2Client.on('tokens', async (tokens) => {
+    try {
+      const updateData = {};
+      if (tokens.access_token) {
+        updateData.access_token = encrypt(tokens.access_token);
+      }
+      if (tokens.refresh_token) {
+        updateData.refresh_token = encrypt(tokens.refresh_token);
+      }
+      if (tokens.expiry_date) {
+        updateData.token_expiry = tokens.expiry_date;
+      }
+      if (Object.keys(updateData).length > 0) {
+        await YoutubeChannel.update(channelId, updateData);
+      }
+    } catch (e) {
+      console.error('[YouTubeService] Error saving refreshed tokens:', e.message);
+    }
+  });
+
+  const now = Date.now();
+  const isExpiring = !selectedChannel.token_expiry || now >= (selectedChannel.token_expiry - 300000);
+
+  if (refreshToken && isExpiring) {
+    try {
+      console.log(`[YouTubeService] Proactively refreshing access token for channel ${selectedChannel.channel_name || channelId}...`);
+      const refreshRes = await oauth2Client.refreshAccessToken();
+      if (refreshRes && refreshRes.credentials) {
+        oauth2Client.setCredentials(refreshRes.credentials);
+        const updateData = {
+          access_token: encrypt(refreshRes.credentials.access_token),
+          token_expiry: refreshRes.credentials.expiry_date
+        };
+        if (refreshRes.credentials.refresh_token) {
+          updateData.refresh_token = encrypt(refreshRes.credentials.refresh_token);
+        }
+        await YoutubeChannel.update(channelId, updateData);
+        console.log(`[YouTubeService] Proactive token refresh successful for ${selectedChannel.channel_name || channelId}`);
+      }
+    } catch (refreshErr) {
+      console.error('[YouTubeService] Proactive token refresh error:', refreshErr.message);
+    }
+  }
+
   return google.youtube({ version: 'v3', auth: oauth2Client });
 }
 
@@ -738,38 +819,124 @@ async function uploadVideoToYoutube(userId, channelId, filePath, metadata) {
     const youtube = await getYoutubeInstance(userId, channelId);
     if (!youtube) throw new Error('Could not get YouTube instance');
 
+    if (!fs.existsSync(filePath)) {
+      throw new Error(`File not found: ${filePath}`);
+    }
+
     const fileSize = fs.statSync(filePath).size;
-    
     console.log(`[YouTubeService] Starting upload for ${filePath} (${fileSize} bytes)`);
 
-    const res = await youtube.videos.insert({
-      part: 'snippet,status',
-      requestBody: {
-        snippet: {
-          title: metadata.title,
-          description: metadata.description || '',
-          tags: metadata.tags ? metadata.tags.split(',').map(t => t.trim()) : [],
-          categoryId: metadata.category || '22',
-        },
-        status: {
-          privacyStatus: metadata.privacy || 'unlisted',
-          selfDeclaredMadeForKids: false,
-        },
-      },
-      media: {
-        body: fs.createReadStream(filePath),
-      },
-    }, {
-      onUploadProgress: evt => {
-        if (metadata.onProgress) {
-          const progress = Math.round((evt.bytesRead / fileSize) * 100);
-          metadata.onProgress(progress);
-        }
-      }
-    });
+    let tags = [];
+    if (Array.isArray(metadata.tags)) {
+      tags = metadata.tags;
+    } else if (typeof metadata.tags === 'string' && metadata.tags.trim()) {
+      tags = metadata.tags.split(',').map(t => t.trim()).filter(Boolean);
+    }
 
-    console.log(`[YouTubeService] Upload successful! Video ID: ${res.data.id}`);
-    return { success: true, videoId: res.data.id };
+    const publishAtVal = metadata.publishAt || metadata.scheduled_publish_at;
+    const statusObj = {
+      privacyStatus: publishAtVal ? 'private' : (metadata.privacy || metadata.privacyStatus || metadata.privacy_status || 'unlisted'),
+      selfDeclaredMadeForKids: Boolean(metadata.madeForKids || metadata.made_for_kids)
+    };
+
+    if (publishAtVal) {
+      statusObj.publishAt = new Date(publishAtVal).toISOString();
+    }
+
+    const performInsert = async (clientInstance) => {
+      return await clientInstance.videos.insert({
+        part: 'snippet,status',
+        requestBody: {
+          snippet: {
+            title: metadata.title,
+            description: metadata.description || '',
+            tags: tags,
+            categoryId: metadata.category || metadata.categoryId || metadata.category_id || '22',
+          },
+          status: statusObj,
+        },
+        media: {
+          body: fs.createReadStream(filePath),
+        },
+      }, {
+        onUploadProgress: evt => {
+          if (metadata.onProgress) {
+            const progress = Math.min(99, Math.round((evt.bytesRead / fileSize) * 100));
+            metadata.onProgress(progress);
+          }
+        }
+      });
+    };
+
+    let res;
+    try {
+      res = await performInsert(youtube);
+    } catch (insertErr) {
+      const errMsg = (insertErr.message || '').toLowerCase();
+      const isAuthErr = errMsg.includes('auth') || errMsg.includes('token') || errMsg.includes('401') || insertErr.code === 401;
+      if (isAuthErr) {
+        console.warn(`[YouTubeService] Upload encountered auth error (${insertErr.message}), forcing token refresh and retrying once...`);
+        // Force refresh by clearing token_expiry in memory for this check
+        await YoutubeChannel.update(channelId, { token_expiry: 0 });
+        const refreshedYoutube = await getYoutubeInstance(userId, channelId);
+        if (!refreshedYoutube) throw insertErr;
+        res = await performInsert(refreshedYoutube);
+      } else {
+        throw insertErr;
+      }
+    }
+
+    const videoId = res.data.id;
+    console.log(`[YouTubeService] Upload successful! Video ID: ${videoId}`);
+
+    // Custom thumbnail upload if provided
+    const thumbPath = metadata.thumbnailPath || metadata.thumbnail_path;
+    if (thumbPath) {
+      try {
+        const fullThumbPath = resolveThumbnailPath(thumbPath);
+        if (fullThumbPath && fs.existsSync(fullThumbPath)) {
+          const finalThumbPath = await ensureCompressedThumbnailPath(fullThumbPath);
+          await youtube.thumbnails.set({
+            videoId: videoId,
+            media: {
+              mimeType: getThumbnailMimeType(finalThumbPath),
+              body: fs.createReadStream(finalThumbPath)
+            }
+          });
+          console.log(`[YouTubeService] Custom thumbnail set for video ${videoId}`);
+        }
+      } catch (thumbErr) {
+        console.warn(`[YouTubeService] Failed to set custom thumbnail:`, thumbErr.message);
+      }
+    }
+
+    // Add to playlist if provided
+    const playlistId = metadata.playlistId || metadata.playlist_id;
+    if (playlistId) {
+      try {
+        await youtube.playlistItems.insert({
+          part: 'snippet',
+          requestBody: {
+            snippet: {
+              playlistId: playlistId,
+              resourceId: {
+                kind: 'youtube#video',
+                videoId: videoId
+              }
+            }
+          }
+        });
+        console.log(`[YouTubeService] Video ${videoId} added to playlist ${playlistId}`);
+      } catch (plErr) {
+        console.warn(`[YouTubeService] Failed to add video to playlist:`, plErr.message);
+      }
+    }
+
+    if (metadata.onProgress) {
+      metadata.onProgress(100);
+    }
+
+    return { success: true, videoId };
   } catch (error) {
     const betterError = handleYoutubeError(error, `(Upload: ${metadata.title})`);
     console.error('[YouTubeService] Error uploading video:', betterError.message);

@@ -94,9 +94,9 @@ async function checkStreamDurations() {
         scheduledTerminations.delete(stream.id);
 
         try {
-          await streamingService.stopStream(stream.id);
+          await streamingService.stopStream(stream.id, { reason: 'scheduled_end' });
         } catch (e) {
-          await Stream.updateStatus(stream.id, 'offline', stream.user_id);
+          await Stream.updateStatus(stream.id, 'offline', stream.user_id, { stopReason: 'scheduled_end' });
         }
       } else if (timeUntilEnd <= 60000 && !scheduledTerminations.has(stream.id)) {
         scheduleStreamTermination(stream.id, timeUntilEnd / 60000, stream.user_id);
@@ -134,7 +134,7 @@ function scheduleStreamTermination(streamId, durationMinutes, userId = null) {
         return;
       }
 
-      await streamingService.stopStream(streamId);
+      await streamingService.stopStream(streamId, { reason: 'scheduled_end' });
       scheduledTerminations.delete(streamId);
     } catch (error) {
       scheduledTerminations.delete(streamId);

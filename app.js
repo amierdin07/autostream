@@ -31,6 +31,7 @@ const Video = require('./models/Video');
 const MediaFolder = require('./models/MediaFolder');
 const Playlist = require('./models/Playlist');
 const Stream = require('./models/Stream');
+const Note = require('./models/Note');
 const ffmpeg = require('fluent-ffmpeg');
 const ffmpegInstaller = require('@ffmpeg-installer/ffmpeg');
 const streamingService = require('./services/streamingService');
@@ -2628,6 +2629,64 @@ app.delete('/api/settings/youtube-channel/:id', isAuthenticated, async (req, res
   }
 });
 
+app.post('/api/settings/youtube-channel/:id/seo', isAuthenticated, async (req, res) => {
+  try {
+    const YoutubeChannel = require('./models/YoutubeChannel');
+    const channel = await YoutubeChannel.findById(req.params.id);
+    
+    if (!channel || channel.user_id !== req.session.userId) {
+      return res.status(404).json({ success: false, error: 'Channel not found' });
+    }
+
+    const { default_description, default_tags, default_category } = req.body;
+
+    await YoutubeChannel.update(req.params.id, {
+      default_description: default_description !== undefined ? String(default_description) : '',
+      default_tags: default_tags !== undefined ? String(default_tags) : '',
+      default_category: default_category !== undefined ? String(default_category) : '22'
+    });
+
+    res.json({
+      success: true,
+      message: 'Template SEO channel berhasil disimpan!',
+      channel: {
+        id: channel.id,
+        default_description: default_description || '',
+        default_tags: default_tags || '',
+        default_category: default_category || '22'
+      }
+    });
+  } catch (error) {
+    console.error('Error saving channel SEO template:', error);
+    res.status(500).json({ success: false, error: 'Gagal menyimpan template SEO channel' });
+  }
+});
+
+app.get('/api/settings/youtube-channel/:id/seo', isAuthenticated, async (req, res) => {
+  try {
+    const YoutubeChannel = require('./models/YoutubeChannel');
+    const channel = await YoutubeChannel.findById(req.params.id);
+    
+    if (!channel || channel.user_id !== req.session.userId) {
+      return res.status(404).json({ success: false, error: 'Channel not found' });
+    }
+
+    res.json({
+      success: true,
+      data: {
+        id: channel.id,
+        channel_name: channel.channel_name,
+        default_description: channel.default_description || '',
+        default_tags: channel.default_tags || '',
+        default_category: channel.default_category || '22'
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching channel SEO template:', error);
+    res.status(500).json({ success: false, error: 'Gagal memuat template SEO channel' });
+  }
+});
+
 const { google } = require('googleapis');
 
 function getAppBaseUrl(req) {
@@ -2776,6 +2835,7 @@ app.get('/auth/youtube/callback', isAuthenticated, async (req, res) => {
       await YoutubeChannel.update(existingChannel.id, {
         access_token: encrypt(tokens.access_token),
         refresh_token: tokens.refresh_token ? encrypt(tokens.refresh_token) : existingChannel.refresh_token,
+        token_expiry: tokens.expiry_date || null,
         channel_name: channelName,
         channel_thumbnail: channelThumbnail,
         subscriber_count: subscriberCount,
@@ -2792,6 +2852,7 @@ app.get('/auth/youtube/callback', isAuthenticated, async (req, res) => {
         subscriber_count: subscriberCount,
         access_token: encrypt(tokens.access_token),
         refresh_token: tokens.refresh_token ? encrypt(tokens.refresh_token) : null,
+        token_expiry: tokens.expiry_date || null,
         youtube_client_id: clientId,
         youtube_client_secret: clientSecretEncrypted,
         app_id: appId
@@ -3662,12 +3723,13 @@ app.post('/api/streams/youtube', isAuthenticated, uploadThumbnail.single('thumbn
       youtube_monetization: ytMonetization === 'true' || ytMonetization === true
     };
     
+    let scheduleStartDate = null;
     if (scheduleStartTime) {
       const [datePart, timePart] = scheduleStartTime.split('T');
       const [year, month, day] = datePart.split('-').map(Number);
       const [hours, minutes] = timePart.split(':').map(Number);
-      const scheduleDate = new Date(year, month - 1, day, hours, minutes);
-      streamData.schedule_time = scheduleDate.toISOString();
+      scheduleStartDate = new Date(year, month - 1, day, hours, minutes);
+      streamData.schedule_time = scheduleStartDate.toISOString();
       streamData.status = 'scheduled';
     } else {
       streamData.status = 'offline';
@@ -3678,7 +3740,19 @@ app.post('/api/streams/youtube', isAuthenticated, uploadThumbnail.single('thumbn
       const [year, month, day] = datePart.split('-').map(Number);
       const [hours, minutes] = timePart.split(':').map(Number);
       const endDate = new Date(year, month - 1, day, hours, minutes);
+
+      const referenceStartTime = scheduleStartDate || new Date();
+      if (endDate <= referenceStartTime) {
+        return res.status(400).json({ 
+          success: false, 
+          error: 'End time must be after start time' 
+        });
+      }
+
       streamData.end_time = endDate.toISOString();
+      const durationMs = endDate - referenceStartTime;
+      const durationMinutes = Math.round(durationMs / (1000 * 60));
+      streamData.duration = durationMinutes > 0 ? durationMinutes : null;
     }
     
     const stream = await Stream.create(streamData);
@@ -3787,17 +3861,30 @@ app.put('/api/streams/:id', isAuthenticated, uploadThumbnail.single('thumbnail')
         
         if (req.body.scheduleEndTime) {
           const scheduleEndDate = parseScheduleDateTime(req.body.scheduleEndTime);
+          if (scheduleEndDate <= scheduleStartDate) {
+            return res.status(400).json({ 
+              success: false, 
+              error: 'End time must be after start time' 
+            });
+          }
           updateData.end_time = scheduleEndDate.toISOString();
+          const durationMinutes = Math.round((scheduleEndDate - scheduleStartDate) / 60000);
+          updateData.duration = durationMinutes > 0 ? durationMinutes : null;
         } else if ('scheduleEndTime' in req.body && !req.body.scheduleEndTime) {
           updateData.end_time = null;
+          updateData.duration = null;
         }
       } else if ('scheduleStartTime' in req.body && !req.body.scheduleStartTime) {
         updateData.schedule_time = null;
         if ('scheduleEndTime' in req.body && !req.body.scheduleEndTime) {
           updateData.end_time = null;
+          updateData.duration = null;
         } else if (req.body.scheduleEndTime) {
           const scheduleEndDate = parseScheduleDateTime(req.body.scheduleEndTime);
+          const refStart = stream.start_time ? new Date(stream.start_time) : new Date();
           updateData.end_time = scheduleEndDate.toISOString();
+          const durationMinutes = Math.round((scheduleEndDate - refStart) / 60000);
+          updateData.duration = durationMinutes > 0 ? durationMinutes : null;
         }
       }
       
@@ -4964,19 +5051,21 @@ app.get('/autolive', isAuthenticated, async (req, res) => {
       // Generate upcoming
       const totalSessions = AutoliveService.getTotalSessions(items);
       const upcomingCount = Math.max(10, totalSessions);
-      const generatedUpcoming = AutoliveService.getUpcomingSchedule(s, items, upcomingCount);
-      generatedUpcoming.forEach(sched => {
-        const timeMs = sched.startTime.getTime();
-        if (!dbStartTimes.has(timeMs)) {
-          scheduleItems.push({
-            startTime: sched.startTime,
-            title: sched.title,
-            thumbnail: sched.thumbnail,
-            index: sched.index,
-            status: 'Belum Mulai'
-          });
-        }
-      });
+      const generatedUpcoming = (await AutoliveService.getUpcomingSchedule(s, items, upcomingCount)) || [];
+      if (Array.isArray(generatedUpcoming)) {
+        generatedUpcoming.forEach(sched => {
+          const timeMs = sched.startTime.getTime();
+          if (!dbStartTimes.has(timeMs)) {
+            scheduleItems.push({
+              startTime: sched.startTime,
+              title: sched.title,
+              thumbnail: sched.thumbnail,
+              index: sched.index,
+              status: 'Belum Mulai'
+            });
+          }
+        });
+      }
 
       // Filter past/live/upcoming
       const pastItems = scheduleItems.filter(item => ['Sudah Selesai', 'Gagal'].includes(item.status));
@@ -5131,7 +5220,7 @@ app.get('/api/autolive/:id/download-schedule', isAuthenticated, async (req, res)
     // Generate upcoming schedules
     const totalSessions = AutoliveService.getTotalSessions(items);
     const upcomingCount = Math.max(100, totalSessions);
-    const generatedUpcoming = AutoliveService.getUpcomingSchedule(series, items, upcomingCount);
+    const generatedUpcoming = await AutoliveService.getUpcomingSchedule(series, items, upcomingCount);
 
     generatedUpcoming.forEach(sched => {
       const timeMs = sched.startTime.getTime();
@@ -5505,6 +5594,325 @@ app.post('/api/autolive/:id/toggle', isAuthenticated, async (req, res) => {
   }
 });
 
+// ==========================================
+// Quick Notes & SEO Snippets API
+// ==========================================
+app.get('/api/notes', isAuthenticated, async (req, res) => {
+  try {
+    const { search, category } = req.query;
+    const notes = await Note.findAll(req.session.userId, { search, category });
+    res.json({ success: true, notes });
+  } catch (error) {
+    console.error('Error fetching notes:', error);
+    res.status(500).json({ success: false, message: 'Gagal memuat catatan', error: error.message });
+  }
+});
+
+app.get('/api/notes/:id', isAuthenticated, async (req, res) => {
+  try {
+    const note = await Note.findById(req.params.id, req.session.userId);
+    if (!note) {
+      return res.status(404).json({ success: false, message: 'Catatan tidak ditemukan' });
+    }
+    res.json({ success: true, note });
+  } catch (error) {
+    console.error('Error fetching note by id:', error);
+    res.status(500).json({ success: false, message: 'Gagal memuat catatan', error: error.message });
+  }
+});
+
+app.post('/api/notes', isAuthenticated, async (req, res) => {
+  try {
+    const { title, content, category } = req.body;
+    if (!title || !title.trim()) {
+      return res.status(400).json({ success: false, message: 'Judul catatan tidak boleh kosong' });
+    }
+    if (!content || !content.trim()) {
+      return res.status(400).json({ success: false, message: 'Isi catatan tidak boleh kosong' });
+    }
+    const note = await Note.create({
+      userId: req.session.userId,
+      title,
+      content,
+      category: category || 'general'
+    });
+    res.json({ success: true, message: 'Catatan berhasil disimpan', note });
+  } catch (error) {
+    console.error('Error creating note:', error);
+    res.status(500).json({ success: false, message: 'Gagal menyimpan catatan', error: error.message });
+  }
+});
+
+app.put('/api/notes/:id', isAuthenticated, async (req, res) => {
+  try {
+    const { title, content, category } = req.body;
+    if (title !== undefined && !title.trim()) {
+      return res.status(400).json({ success: false, message: 'Judul catatan tidak boleh kosong' });
+    }
+    if (content !== undefined && !content.trim()) {
+      return res.status(400).json({ success: false, message: 'Isi catatan tidak boleh kosong' });
+    }
+    const note = await Note.update(req.params.id, req.session.userId, {
+      title,
+      content,
+      category
+    });
+    if (!note) {
+      return res.status(404).json({ success: false, message: 'Catatan tidak ditemukan atau tidak ada perubahan' });
+    }
+    res.json({ success: true, message: 'Catatan berhasil diperbarui', note });
+  } catch (error) {
+    console.error('Error updating note:', error);
+    res.status(500).json({ success: false, message: 'Gagal memperbarui catatan', error: error.message });
+  }
+});
+
+app.delete('/api/notes/:id', isAuthenticated, async (req, res) => {
+  try {
+    const deleted = await Note.delete(req.params.id, req.session.userId);
+    if (!deleted) {
+      return res.status(404).json({ success: false, message: 'Catatan tidak ditemukan' });
+    }
+    res.json({ success: true, message: 'Catatan berhasil dihapus' });
+  } catch (error) {
+    console.error('Error deleting note:', error);
+    res.status(500).json({ success: false, message: 'Gagal menghapus catatan', error: error.message });
+  }
+});
+
+// --- Regular YouTube Upload Routes ---
+const RegularUpload = require('./models/RegularUpload');
+const RegularUploadService = require('./services/regularUploadService');
+const { uploadRegularMedia } = require('./middleware/uploadMiddleware');
+const youtubeService = require('./services/youtubeService');
+
+app.get('/reguler', isAuthenticated, async (req, res) => {
+  try {
+    const user = await User.findById(req.session.userId);
+    const YoutubeChannel = require('./models/YoutubeChannel');
+    const youtubeChannels = await YoutubeChannel.findAll(req.session.userId);
+    const isYoutubeConnected = youtubeChannels.length > 0;
+    const defaultChannel = youtubeChannels.find(c => c.is_default) || youtubeChannels[0];
+
+    const allVideos = await Video.findAll(req.session.userId);
+    const videos = allVideos.filter(video => {
+      const filepath = (video.filepath || '').toLowerCase();
+      if (filepath.includes('/audio/')) return false;
+      if (filepath.endsWith('.m4a') || filepath.endsWith('.aac') || filepath.endsWith('.mp3')) return false;
+      return true;
+    });
+
+    const uploads = await RegularUpload.findAll(req.session.userId);
+
+    let playlists = [];
+    if (isYoutubeConnected && defaultChannel) {
+      try {
+        playlists = await youtubeService.getPlaylists(req.session.userId, defaultChannel.id);
+      } catch (err) {
+        console.warn('[Reguler] Could not load playlists:', err.message);
+      }
+    }
+
+    res.render('reguler', {
+      title: 'Upload Reguler',
+      active: 'reguler',
+      user,
+      youtubeConnected: isYoutubeConnected,
+      youtubeChannels,
+      videos,
+      uploads,
+      playlists
+    });
+  } catch (error) {
+    console.error('Error loading reguler page:', error);
+    res.redirect('/dashboard');
+  }
+});
+
+app.get('/api/reguler/playlists/:channelId', isAuthenticated, async (req, res) => {
+  try {
+    const { channelId } = req.params;
+    const playlists = await youtubeService.getPlaylists(req.session.userId, channelId);
+    res.json({ success: true, playlists });
+  } catch (error) {
+    console.error('Error fetching playlists for channel:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+app.post('/api/reguler/upload', isAuthenticated, (req, res, next) => {
+  uploadRegularMedia.fields([
+    { name: 'video_file', maxCount: 1 },
+    { name: 'thumbnail_file', maxCount: 1 }
+  ])(req, res, (err) => {
+    if (err) {
+      return res.status(400).json({ success: false, error: err.message });
+    }
+    next();
+  });
+}, async (req, res) => {
+  try {
+    const {
+      youtube_channel_id,
+      video_id,
+      title,
+      description,
+      tags,
+      category_id,
+      privacy_status,
+      made_for_kids,
+      scheduled_publish_at,
+      playlist_id
+    } = req.body;
+
+    if (!youtube_channel_id) {
+      return res.status(400).json({ success: false, error: 'Pilih channel YouTube terlebih dahulu' });
+    }
+    if (!title || !title.trim()) {
+      return res.status(400).json({ success: false, error: 'Judul video tidak boleh kosong' });
+    }
+
+    let videoPath = null;
+    let videoTitle = title.trim();
+    let thumbnailPath = null;
+
+    // Check video source
+    if (req.files && req.files['video_file'] && req.files['video_file'][0]) {
+      const file = req.files['video_file'][0];
+      videoPath = file.path;
+      videoTitle = path.parse(file.originalname).name;
+    } else if (video_id) {
+      const selectedVideo = await Video.findById(video_id);
+      if (!selectedVideo || selectedVideo.user_id !== req.session.userId) {
+        return res.status(404).json({ success: false, error: 'Video dari galeri tidak ditemukan' });
+      }
+      const relPath = selectedVideo.filepath.startsWith('/') ? selectedVideo.filepath.substring(1) : selectedVideo.filepath;
+      videoPath = path.join(__dirname, 'public', relPath);
+      videoTitle = selectedVideo.title;
+      if (selectedVideo.thumbnail_path && !thumbnailPath) {
+        thumbnailPath = selectedVideo.thumbnail_path;
+      }
+    } else {
+      return res.status(400).json({ success: false, error: 'Pilih video dari galeri atau upload file video baru' });
+    }
+
+    if (!fs.existsSync(videoPath)) {
+      return res.status(404).json({ success: false, error: 'File video tidak ditemukan di server' });
+    }
+
+    // Check custom thumbnail file upload
+    if (req.files && req.files['thumbnail_file'] && req.files['thumbnail_file'][0]) {
+      thumbnailPath = req.files['thumbnail_file'][0].path;
+    }
+
+    const scheduleMode = req.body.schedule_mode || 'youtube';
+    const deleteAfterUpload = req.body.delete_after_upload === '0' || req.body.delete_after_upload === 'false' ? 0 : 1;
+    const isVpsScheduled = scheduled_publish_at && scheduleMode === 'vps';
+
+    // Create record in regular_uploads
+    const uploadRecord = await RegularUpload.create({
+      user_id: req.session.userId,
+      youtube_channel_id,
+      video_id: video_id || null,
+      video_path: videoPath,
+      video_title: videoTitle,
+      title: title.trim(),
+      description: description || '',
+      tags: tags || '',
+      category_id: category_id || '22',
+      privacy_status: privacy_status || 'public',
+      made_for_kids: made_for_kids === '1' || made_for_kids === true,
+      thumbnail_path: thumbnailPath,
+      scheduled_publish_at: scheduled_publish_at ? new Date(scheduled_publish_at).toISOString() : null,
+      schedule_mode: scheduleMode,
+      delete_after_upload: deleteAfterUpload,
+      playlist_id: playlist_id || null,
+      status: isVpsScheduled ? 'scheduled' : 'pending'
+    });
+
+    if (isVpsScheduled) {
+      return res.json({
+        success: true,
+        isScheduled: true,
+        message: 'Video berhasil dijadwalkan di VPS. File video ditahan di server dan otomatis di-upload ke YouTube saat jam rilis tiba.',
+        uploadId: uploadRecord.id
+      });
+    }
+
+    // Start background upload process immediately
+    RegularUploadService.startUpload(uploadRecord);
+
+    res.json({
+      success: true,
+      isScheduled: false,
+      message: 'Video sedang diunggah ke YouTube di background',
+      uploadId: uploadRecord.id
+    });
+  } catch (error) {
+    console.error('Error initiating regular upload:', error);
+    res.status(500).json({ success: false, error: error.message || 'Gagal memulai upload video' });
+  }
+});
+
+app.get('/api/reguler/status/:id', isAuthenticated, async (req, res) => {
+  try {
+    const status = await RegularUploadService.getStatus(req.params.id, req.session.userId);
+    if (!status) {
+      return res.status(404).json({ success: false, error: 'Upload not found' });
+    }
+    res.json({ success: true, upload: status });
+  } catch (error) {
+    console.error('Error getting upload status:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+app.get('/api/reguler/history', isAuthenticated, async (req, res) => {
+  try {
+    const uploads = await RegularUpload.findAll(req.session.userId);
+    res.json({ success: true, uploads });
+  } catch (error) {
+    console.error('Error fetching upload history:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+app.delete('/api/reguler/:id', isAuthenticated, async (req, res) => {
+  try {
+    const deleted = await RegularUpload.delete(req.params.id, req.session.userId);
+    if (!deleted) {
+      return res.status(404).json({ success: false, error: 'Upload record not found' });
+    }
+    res.json({ success: true, message: 'Riwayat upload berhasil dihapus' });
+  } catch (error) {
+    console.error('Error deleting upload record:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+app.post('/api/reguler/retry/:id', isAuthenticated, async (req, res) => {
+  try {
+    const record = await RegularUpload.findById(req.params.id);
+    if (!record || record.user_id !== req.session.userId) {
+      return res.status(404).json({ success: false, error: 'Upload not found' });
+    }
+    if (!fs.existsSync(record.video_path)) {
+      return res.status(400).json({ success: false, error: 'File video sudah tidak ada di VPS, silakan pilih/upload file baru.' });
+    }
+    await RegularUpload.update(record.id, {
+      status: 'pending',
+      progress: 0,
+      error_message: null
+    });
+    const updatedRecord = await RegularUpload.findById(record.id);
+    RegularUploadService.startUpload(updatedRecord);
+    res.json({ success: true, message: 'Upload dimulai kembali.' });
+  } catch (err) {
+    console.error('Error retrying upload:', err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 
 const server = app.listen(port, '0.0.0.0', async () => {
   try {
@@ -5514,6 +5922,8 @@ const server = app.listen(port, '0.0.0.0', async () => {
     
     const telegramBotService = require('./services/telegramBotService');
     telegramBotService.init();
+
+    RegularUploadService.init();
 
   } catch (error) {
     console.error('Failed to initialize database:', error);
@@ -5534,7 +5944,11 @@ const server = app.listen(port, '0.0.0.0', async () => {
     if (streams && streams.length > 0) {
       console.log(`AutoStream: Resuming ${streams.length} live streams on startup...`);
       for (const stream of streams) {
-        streamingService.startStream(stream.id, false).catch(err => {
+        streamingService.startStream(stream.id, false).then(result => {
+          if (result && !result.success && result.isCompleted) {
+            console.log(`[Startup] Stream ${stream.id} (${stream.title}) broadcast was already ended on YouTube. Marked as done.`);
+          }
+        }).catch(err => {
           console.error(`Failed to resume stream ${stream.id} on startup:`, err);
           Stream.updateStatus(stream.id, 'offline', null, {
             stopReason: 'start_failed',

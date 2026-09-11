@@ -177,14 +177,12 @@ class AutoliveService {
       const LOCAL_PREPARE_WINDOW = 30 * 60 * 1000; // 30 minutes
       if (!linkedStream && !isPastSession && timeToTarget <= LOCAL_PREPARE_WINDOW) {
         try {
-          const { item: chosenSlot } = this.getItemForGlobalIndex(series, items, session.globalIndex);
+          const { item: chosenSlot, titleIndex } = this.getItemForGlobalIndex(series, items, session.globalIndex);
           const chosenVideoId = chosenSlot.internal_playlist_id || chosenSlot.video_id || series.internal_playlist_id || series.video_id;
-          const titles = chosenSlot.titles || [];
-          const itemTitle = titles[session.globalIndex % (titles.length || 1)] || series.name;
-          const thumbnails = chosenSlot.thumbnails || [];
-          const itemThumbnail = thumbnails[session.globalIndex % (thumbnails.length || 1)] || '';
+          const airedSet = await this.getAiredTitlesSet();
+          const { title: itemTitle, thumbnail: itemThumbnail } = this.getUnairedTitleAndThumbnail(chosenSlot, titleIndex, airedSet);
           
-          console.log(`[Autolive] Preparing and syncing stream session ${targetStart.toISOString()} of "${series.name}" (globalIndex=${session.globalIndex}) (30 mins before live)`);
+          console.log(`[Autolive] Preparing and syncing stream session ${targetStart.toISOString()} of "${series.name}" (globalIndex=${session.globalIndex}, round=${titleIndex}) (30 mins before live) -> Title: "${itemTitle}"`);
           
           await this.getOrCreateStreamRecord(series, {
             title: itemTitle,
@@ -216,7 +214,8 @@ class AutoliveService {
       }
 
       // 1. If this session is currently active and the stream is not live yet, trigger scheduler to start it
-      if (isCurrentlyActive && (!linkedStream || linkedStream.status === 'scheduled')) {
+      const currentStream = await Stream.findById(streamId);
+      if (isCurrentlyActive && currentStream && currentStream.status === 'scheduled') {
         const schedulerService = require('./schedulerService');
         schedulerService.checkScheduledStreams().catch(err => {
           console.error('[Autolive] Error triggering stream scheduler:', err);
@@ -511,14 +510,7 @@ class AutoliveService {
       
       // Round-based rotation: determine which item and title to use
       const totalSessions = this.getTotalSessions(items);
-      // Compute globalIndex directly from DB count of already-created streams for this series
-      let globalIndex = await new Promise((resolve) => {
-        db.get(
-          `SELECT COUNT(*) as cnt FROM streams WHERE id LIKE ? AND id NOT LIKE 'autolive_%_autolive_%'`,
-          [`autolive_${series.id}_%`],
-          (err, row) => resolve((row && row.cnt) || 0)
-        );
-      });
+      let globalIndex = this.getSlotIndexForSession(series, scheduledStart);
 
       const upcoming = await this.getUpcomingSchedule(series, items, 15);
       const matchingSession = upcoming.find(s => s.startTime.getTime() === scheduledStart.getTime());
@@ -571,11 +563,12 @@ class AutoliveService {
         }
       }
 
-      const titles = chosenSlot.titles || [];
-      const thumbnails = chosenSlot.thumbnails || [];
-      
-      const title = titles[titleIndex % (titles.length || 1)] || series.name;
-      const thumbnail = thumbnails[titleIndex % (thumbnails.length || 1)] || '';
+      const airedSet = await this.getAiredTitlesSet();
+      // Exclude streamRecord's existing title from aired set so it doesn't collide with itself if already set
+      if (streamRecord && streamRecord.title) {
+        airedSet.delete(streamRecord.title.trim().toLowerCase());
+      }
+      const { title, thumbnail } = this.getUnairedTitleAndThumbnail(chosenSlot, titleIndex, airedSet);
 
       const sourceSettings = await getAutoliveSourceSettings(chosenSlot);
       const sourceRes = sourceSettings.resolution || null;
@@ -616,7 +609,7 @@ class AutoliveService {
         schedule_time: scheduledStart.toISOString(),
         end_time: scheduledEnd.toISOString(),
         duration: series.duration || null,
-        status: (streamRecord.status === 'live' || streamRecord.status === 'offline' || streamRecord.status === 'done') ? streamRecord.status : 'scheduled'
+        status: (streamRecord.status === 'live' || streamRecord.status === 'done') ? streamRecord.status : 'scheduled'
       });
 
       const baseUrl = process.env.BASE_URL || 'http://localhost:7575';
@@ -701,10 +694,9 @@ class AutoliveService {
       const items = await Autolive.getItemsBySeriesId(series.id);
       if (items.length > 0) {
         const { item: currentItem, titleIndex } = this.getItemForGlobalIndex(series, items, series.current_item_index || 0);
-        const itemTitles = Array.isArray(currentItem.titles) ? currentItem.titles : [];
-        const itemThumbnails = Array.isArray(currentItem.thumbnails) ? currentItem.thumbnails : [];
-        const currentTitle = itemTitles[titleIndex % (itemTitles.length || 1)] || currentItem.title || series.name;
-        const currentThumbnail = itemThumbnails[titleIndex % (itemThumbnails.length || 1)] || currentItem.thumbnail_path || '';
+        const airedSet = await this.getAiredTitlesSet();
+        if (streamRecord.title) airedSet.delete(streamRecord.title.trim().toLowerCase());
+        const { title: currentTitle, thumbnail: currentThumbnail } = this.getUnairedTitleAndThumbnail(currentItem, titleIndex, airedSet);
         
         console.log(`[Autolive] Starting stream ${streamRecord.id} with round-based metadata. Title: ${currentTitle}`);
         await Stream.update(streamRecord.id, {
@@ -875,10 +867,9 @@ class AutoliveService {
         }
 
         const { item: currentItem, titleIndex } = this.getItemForGlobalIndex(series, items, globalIndex);
-        const syncTitles = Array.isArray(currentItem.titles) ? currentItem.titles : [];
-        const syncThumbnails = Array.isArray(currentItem.thumbnails) ? currentItem.thumbnails : [];
-        const currentTitle = syncTitles[titleIndex % (syncTitles.length || 1)] || currentItem.title || series.name;
-        const currentThumbnail = syncThumbnails[titleIndex % (syncThumbnails.length || 1)] || currentItem.thumbnail_path || '';
+        const airedSet = await this.getAiredTitlesSet();
+        if (stream.title) airedSet.delete(stream.title.trim().toLowerCase());
+        const { title: currentTitle, thumbnail: currentThumbnail } = this.getUnairedTitleAndThumbnail(currentItem, titleIndex, airedSet);
 
         const sourceSettings = await getAutoliveSourceSettings(currentItem);
         await Stream.update(stream.id, {
@@ -934,31 +925,8 @@ class AutoliveService {
   static getFullOrderForRound(seriesId, roundNumber, itemCount) {
     if (itemCount <= 1) return [0];
     
-    // Round 0: sequential order
-    if (roundNumber === 0) {
-      return Array.from({ length: itemCount }, (_, i) => i);
-    }
-    
-    // Round 1+: seeded shuffle
-    let order = seededShuffle(
-      Array.from({ length: itemCount }, (_, i) => i),
-      hashCode(seriesId + '_round_' + roundNumber)
-    );
-    
-    // Anti-consecutive: ensure first of this round != last of previous round
-    const prevOrder = this.getFullOrderForRound(seriesId, roundNumber - 1, itemCount);
-    const lastOfPrev = prevOrder[itemCount - 1];
-    
-    if (order[0] === lastOfPrev) {
-      for (let swapIdx = 1; swapIdx < order.length; swapIdx++) {
-        if (order[swapIdx] !== lastOfPrev) {
-          [order[0], order[swapIdx]] = [order[swapIdx], order[0]];
-          break;
-        }
-      }
-    }
-    
-    return order;
+    // Always return sequential order for all rounds to play slots 1 to N consistently
+    return Array.from({ length: itemCount }, (_, i) => i);
   }
 
   static getItemForGlobalIndex(series, items, globalIndex) {
@@ -981,96 +949,178 @@ class AutoliveService {
     };
   }
 
-  static async getUpcomingSchedule(series, items, count = 5) {
-    if (!items || items.length === 0) return [];
-    
-    const schedule = [];
+  static getSlotIndexForSession(series, targetStartTime) {
+    if (!series || !series.start_time || !targetStartTime) return 0;
     const timeZone = getSeriesTimeZone(series);
-    const durationMs = (series.duration || 60) * 60 * 1000;
-    const now = new Date();
-    const totalSessions = this.getTotalSessions(items);
-    
-    let currentStart = this.getCurrentSessionStart(series, series.repeat_mode, now, timeZone);
-    
-    // Determine starting globalIndex from the count of already-created stream records in DB.
-    // This is the only reliable source: immune to drift, race conditions, and restarts.
-    let globalIndex = await new Promise((resolve) => {
-      db.get(
-        `SELECT COUNT(*) as cnt FROM streams WHERE id LIKE ? AND id NOT LIKE 'autolive_%_autolive_%'`,
-        [`autolive_${series.id}_%`],
-        (err, row) => resolve((row && row.cnt) || 0)
+    const originalStart = parseLocalDateTime(series.start_time);
+    if (isNaN(originalStart.getTime())) return 0;
+
+    let cur = this.getCurrentSessionStart(series, series.repeat_mode, originalStart, timeZone);
+    let count = 0;
+    const targetMs = new Date(targetStartTime).getTime();
+
+    // Count scheduled slots from original start up to target
+    for (let i = 0; i < 5000; i++) {
+      if (cur.getTime() >= targetMs) return count;
+      count++;
+      const nextRelativeTo = new Date(cur.getTime() + 1000);
+      cur = this.getNextStartTime(series, series.repeat_mode, series.custom_dates, timeZone, nextRelativeTo);
+      if (!cur || isNaN(cur.getTime()) || cur.getTime() > 8640000000000000 - 100000) break;
+    }
+    return count;
+  }
+
+  static async getAiredTitlesSet() {
+    return new Promise((resolve) => {
+      db.all(
+        `SELECT DISTINCT title FROM stream_history WHERE status = 'done'
+         UNION
+         SELECT DISTINCT title FROM streams WHERE status IN ('done', 'live')`,
+        [],
+        (err, rows) => {
+          const set = new Set();
+          if (rows) {
+            rows.forEach(r => {
+              if (r.title) set.add(r.title.trim().toLowerCase());
+            });
+          }
+          resolve(set);
+        }
       );
     });
-    
-    // If the current session is already in the past (finished), move to next
-    if (new Date(currentStart.getTime() + durationMs) < now) {
-      currentStart = this.getNextStartTime(series, series.repeat_mode, series.custom_dates, timeZone);
-    }
-    
-    for (let i = 0; i < count; i++) {
-      // Stop if all sessions exhausted
-      if (globalIndex >= totalSessions) break;
-      
-      const { item, titleIndex, positionInRound } = this.getItemForGlobalIndex(series, items, globalIndex);
-      if (!item) break;
-      
-      const titles = Array.isArray(item.titles) ? item.titles : [];
-      const thumbnails = Array.isArray(item.thumbnails) ? item.thumbnails : [];
-      
-      const title = titles[titleIndex % (titles.length || 1)] || series.name;
-      const thumbnail = thumbnails[titleIndex % (thumbnails.length || 1)] || '';
+  }
 
-      schedule.push({
-        startTime: new Date(currentStart),
-        endTime: new Date(currentStart.getTime() + durationMs),
-        title: title,
-        thumbnail: thumbnail,
-        index: positionInRound + 1,
-        globalIndex: globalIndex,
-        titleIndex: titleIndex
-      });
-      
-      // Calculate next start
-      const stepDays = this.getRepeatStepDays(series.repeat_mode);
-      if (series.repeat_mode === 'none' || !stepDays) {
-        if (series.repeat_mode === 'custom' && series.custom_dates) {
-             try {
-                 const dates = JSON.parse(series.custom_dates);
-                 const timeParts = getZonedParts(parseLocalDateTime(series.start_time), timeZone);
-                 const sortedDates = dates
-                     .map(d => makeDateInTimeZone({
-                         year: Number(d.slice(0, 4)),
-                         month: Number(d.slice(5, 7)),
-                         day: Number(d.slice(8, 10)),
-                         hour: timeParts.hour,
-                         minute: timeParts.minute,
-                         second: 0
-                     }, timeZone))
-                     .sort((a, b) => a - b);
-                 
-                 const currentIndex = sortedDates.findIndex(d => d.getTime() === currentStart.getTime());
-                 if (currentIndex !== -1 && currentIndex + 1 < sortedDates.length) {
-                     currentStart = sortedDates[currentIndex + 1];
-                 } else {
-                     break; // No more dates
-                 }
-             } catch(e) { break; }
-        } else {
-            break; 
-        }
-      } else {
-        if (series.repeat_mode === 'daily' && series.daily_times) {
-            const nextRelativeTo = new Date(currentStart.getTime() + 1000);
-            currentStart = this.getNextStartTime(series, series.repeat_mode, null, timeZone, nextRelativeTo);
-        } else {
-            const currentParts = getZonedParts(currentStart, timeZone);
-            currentStart = makeDateInTimeZone(addDaysToZonedParts(currentParts, stepDays), timeZone);
-        }
-      }
-      globalIndex++;
+  static getUnairedTitleAndThumbnail(item, preferredIndex = 0, airedTitlesSet = null) {
+    if (!item) return { title: 'Untitled', thumbnail: '', titleIndex: 0 };
+    const titles = Array.isArray(item.titles) ? item.titles : [];
+    const thumbnails = Array.isArray(item.thumbnails) ? item.thumbnails : [];
+    if (titles.length === 0) {
+      return {
+        title: item.title || 'Untitled',
+        thumbnail: item.thumbnail_path || '',
+        titleIndex: 0
+      };
     }
-    
-    return schedule;
+
+    if (!airedTitlesSet || airedTitlesSet.size === 0) {
+      const idx = preferredIndex % titles.length;
+      return {
+        title: titles[idx],
+        thumbnail: thumbnails[idx] || '',
+        titleIndex: idx
+      };
+    }
+
+    // Try starting from preferredIndex and find the first unaired title
+    for (let offset = 0; offset < titles.length; offset++) {
+      const candidateIdx = (preferredIndex + offset) % titles.length;
+      const candidateTitle = titles[candidateIdx];
+      if (candidateTitle && !airedTitlesSet.has(candidateTitle.trim().toLowerCase())) {
+        return {
+          title: candidateTitle,
+          thumbnail: thumbnails[candidateIdx] || '',
+          titleIndex: candidateIdx
+        };
+      }
+    }
+
+    // If ALL titles in this slot have already aired, fallback to the preferred title
+    const fallbackIdx = preferredIndex % titles.length;
+    return {
+      title: titles[fallbackIdx],
+      thumbnail: thumbnails[fallbackIdx] || '',
+      titleIndex: fallbackIdx,
+      allAired: true
+    };
+  }
+
+  static async getUpcomingSchedule(series, items, count = 5) {
+    try {
+      if (!items || items.length === 0) return [];
+      
+      const schedule = [];
+      const timeZone = getSeriesTimeZone(series);
+      const durationMs = (series.duration || 60) * 60 * 1000;
+      const now = new Date();
+      const totalSessions = this.getTotalSessions(items);
+      
+      let currentStart = this.getCurrentSessionStart(series, series.repeat_mode, now, timeZone);
+      
+      // If the current session is already in the past (finished), move to next
+      if (new Date(currentStart.getTime() + durationMs) < now) {
+        currentStart = this.getNextStartTime(series, series.repeat_mode, series.custom_dates, timeZone, now);
+      }
+
+      // Calculate starting globalIndex based on elapsed schedule slots from series start_time
+      let globalIndex = this.getSlotIndexForSession(series, currentStart);
+      const airedSet = await this.getAiredTitlesSet();
+      const simulatedAired = new Set(airedSet);
+      
+      for (let i = 0; i < count; i++) {
+        // Stop if all sessions exhausted
+        if (globalIndex >= totalSessions) break;
+        
+        const { item, titleIndex, positionInRound } = this.getItemForGlobalIndex(series, items, globalIndex);
+        if (!item) break;
+        
+        const { title, thumbnail, titleIndex: selectedTitleIdx } = this.getUnairedTitleAndThumbnail(item, titleIndex, simulatedAired);
+        simulatedAired.add(title.trim().toLowerCase());
+
+        schedule.push({
+          startTime: new Date(currentStart),
+          endTime: new Date(currentStart.getTime() + durationMs),
+          title: title,
+          thumbnail: thumbnail,
+          index: positionInRound + 1,
+          globalIndex: globalIndex,
+          titleIndex: selectedTitleIdx
+        });
+        
+        // Calculate next start
+        const stepDays = this.getRepeatStepDays(series.repeat_mode);
+        if (series.repeat_mode === 'none' || !stepDays) {
+          if (series.repeat_mode === 'custom' && series.custom_dates) {
+               try {
+                   const dates = JSON.parse(series.custom_dates);
+                   const timeParts = getZonedParts(parseLocalDateTime(series.start_time), timeZone);
+                   const sortedDates = dates
+                       .map(d => makeDateInTimeZone({
+                           year: Number(d.slice(0, 4)),
+                           month: Number(d.slice(5, 7)),
+                           day: Number(d.slice(8, 10)),
+                           hour: timeParts.hour,
+                           minute: timeParts.minute,
+                           second: 0
+                       }, timeZone))
+                       .sort((a, b) => a - b);
+                   
+                   const currentIndex = sortedDates.findIndex(d => d.getTime() === currentStart.getTime());
+                   if (currentIndex !== -1 && currentIndex + 1 < sortedDates.length) {
+                       currentStart = sortedDates[currentIndex + 1];
+                   } else {
+                       break; // No more dates
+                   }
+               } catch(e) { break; }
+          } else {
+              break; 
+          }
+        } else {
+          if (series.repeat_mode === 'daily' && series.daily_times) {
+              const nextRelativeTo = new Date(currentStart.getTime() + 1000);
+              currentStart = this.getNextStartTime(series, series.repeat_mode, null, timeZone, nextRelativeTo);
+          } else {
+              const currentParts = getZonedParts(currentStart, timeZone);
+              currentStart = makeDateInTimeZone(addDaysToZonedParts(currentParts, stepDays), timeZone);
+          }
+        }
+        globalIndex++;
+      }
+      
+      return schedule;
+    } catch (err) {
+      console.error('[AutoliveService] Error generating upcoming schedule:', err);
+      return [];
+    }
   }
 
   static async getNextRandomVideoData(series, playlistId) {

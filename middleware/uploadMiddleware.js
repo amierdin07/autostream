@@ -95,9 +95,36 @@ const uploadThumbnail = multer({
   fileFilter: imageFilter
 });
 
+const regularStorage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    if (file.fieldname === 'thumbnail_file') {
+      cb(null, paths.thumbnails);
+    } else {
+      cb(null, paths.videos);
+    }
+  },
+  filename: (req, file, cb) => {
+    const uniqueFilename = getUniqueFilename(file.originalname);
+    cb(null, uniqueFilename);
+  }
+});
+
+const regularFilter = (req, file, cb) => {
+  if (file.fieldname === 'thumbnail_file') {
+    return imageFilter(req, file, cb);
+  }
+  return videoFilter(req, file, cb);
+};
+
+const uploadRegularMedia = multer({
+  storage: regularStorage,
+  fileFilter: regularFilter
+});
+
 module.exports = {
   uploadVideo,
   uploadAudio,
   upload,
-  uploadThumbnail
+  uploadThumbnail,
+  uploadRegularMedia
 };

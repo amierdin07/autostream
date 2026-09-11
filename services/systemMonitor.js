@@ -45,7 +45,16 @@ async function getSystemStats() {
     return {
       cpu: { usage: 0, cores: 0 },
       memory: { total: "0 GB", used: "0 GB", free: "0 GB", usagePercent: 0 },
-      network: { download: 0, upload: 0, downloadFormatted: '0 Mbps', uploadFormatted: '0 Mbps' },
+      network: { 
+        download: 0, 
+        upload: 0, 
+        downloadFormatted: '0 Mbps', 
+        uploadFormatted: '0 Mbps',
+        totalDownload: 0,
+        totalUpload: 0,
+        totalDownloadFormatted: '0 B',
+        totalUploadFormatted: '0 B'
+      },
       disk: { total: "0 GB", used: "0 GB", free: "0 GB", usagePercent: 0, drive: "N/A" },
       platform: process.platform,
       timestamp: Date.now()
@@ -53,8 +62,27 @@ async function getSystemStats() {
   }
 }
 
+function formatBytes(bytes) {
+  if (!bytes || isNaN(bytes) || bytes <= 0) return '0 B';
+  const k = 1024;
+  const sizes = ['B', 'KB', 'MB', 'GB', 'TB', 'PB'];
+  const i = Math.min(Math.floor(Math.log(bytes) / Math.log(k)), sizes.length - 1);
+  return (bytes / Math.pow(k, i)).toFixed(2) + ' ' + sizes[i];
+}
+
 function calculateNetworkSpeed(networkData) {
   const currentTimestamp = Date.now();
+  const networkList = Array.isArray(networkData) ? networkData : [];
+
+  const currentTotal = networkList
+    .filter(iface => iface && iface.iface && !iface.iface.includes('lo') && !iface.iface.includes('Loopback'))
+    .reduce((acc, iface) => ({
+      rx_bytes: acc.rx_bytes + (iface.rx_bytes || 0),
+      tx_bytes: acc.tx_bytes + (iface.tx_bytes || 0)
+    }), { rx_bytes: 0, tx_bytes: 0 });
+
+  const totalDownloadFormatted = formatBytes(currentTotal.rx_bytes);
+  const totalUploadFormatted = formatBytes(currentTotal.tx_bytes);
   
   if (!previousNetworkData || !previousTimestamp) {
     previousNetworkData = networkData;
@@ -63,28 +91,27 @@ function calculateNetworkSpeed(networkData) {
       download: 0,
       upload: 0,
       downloadFormatted: '0 Mbps',
-      uploadFormatted: '0 Mbps'
+      uploadFormatted: '0 Mbps',
+      totalDownload: currentTotal.rx_bytes,
+      totalUpload: currentTotal.tx_bytes,
+      totalDownloadFormatted: totalDownloadFormatted,
+      totalUploadFormatted: totalUploadFormatted
     };
   }
   
   const timeDiff = (currentTimestamp - previousTimestamp) / 1000;
+  const prevList = Array.isArray(previousNetworkData) ? previousNetworkData : [];
   
-  const currentTotal = networkData
-    .filter(iface => !iface.iface.includes('lo') && !iface.iface.includes('Loopback'))
+  const previousTotal = prevList
+    .filter(iface => iface && iface.iface && !iface.iface.includes('lo') && !iface.iface.includes('Loopback'))
     .reduce((acc, iface) => ({
       rx_bytes: acc.rx_bytes + (iface.rx_bytes || 0),
       tx_bytes: acc.tx_bytes + (iface.tx_bytes || 0)
     }), { rx_bytes: 0, tx_bytes: 0 });
   
-  const previousTotal = previousNetworkData
-    .filter(iface => !iface.iface.includes('lo') && !iface.iface.includes('Loopback'))
-    .reduce((acc, iface) => ({
-      rx_bytes: acc.rx_bytes + (iface.rx_bytes || 0),
-      tx_bytes: acc.tx_bytes + (iface.tx_bytes || 0)
-    }), { rx_bytes: 0, tx_bytes: 0 });
-  
-  const downloadBps = Math.max(0, (currentTotal.rx_bytes - previousTotal.rx_bytes) / timeDiff);
-  const uploadBps = Math.max(0, (currentTotal.tx_bytes - previousTotal.tx_bytes) / timeDiff);
+  const safeTimeDiff = timeDiff > 0 ? timeDiff : 1;
+  const downloadBps = Math.max(0, (currentTotal.rx_bytes - previousTotal.rx_bytes) / safeTimeDiff);
+  const uploadBps = Math.max(0, (currentTotal.tx_bytes - previousTotal.tx_bytes) / safeTimeDiff);
   
   const downloadMbps = (downloadBps * 8) / (1024 * 1024);
   const uploadMbps = (uploadBps * 8) / (1024 * 1024);
@@ -96,7 +123,11 @@ function calculateNetworkSpeed(networkData) {
     download: downloadMbps,
     upload: uploadMbps,
     downloadFormatted: formatSpeed(downloadMbps),
-    uploadFormatted: formatSpeed(uploadMbps)
+    uploadFormatted: formatSpeed(uploadMbps),
+    totalDownload: currentTotal.rx_bytes,
+    totalUpload: currentTotal.tx_bytes,
+    totalDownloadFormatted: totalDownloadFormatted,
+    totalUploadFormatted: totalUploadFormatted
   };
 }
 

@@ -11,3 +11,8 @@ logs/
 db/*.db
 db/*.sqlite
 db/*.sqlite3
+
+# Logs & temporary files
+*.log
+temp/
+speedtest.py
