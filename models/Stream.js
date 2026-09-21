@@ -94,7 +94,10 @@ class Stream {
         SELECT s.*, 
                v.title AS video_title, 
                v.filepath AS video_filepath,
-               v.thumbnail_path AS video_thumbnail, 
+               COALESCE(
+                 v.thumbnail_path,
+                 (SELECT v2.thumbnail_path FROM playlist_videos pv2 JOIN videos v2 ON pv2.video_id = v2.id WHERE pv2.playlist_id = s.video_id AND v2.thumbnail_path IS NOT NULL ORDER BY pv2.position ASC LIMIT 1)
+               ) AS video_thumbnail, 
                v.duration AS video_duration,
                v.resolution AS video_resolution,  
                v.bitrate AS video_bitrate,        
@@ -209,7 +212,10 @@ class Stream {
           SELECT s.*, 
                  v.title AS video_title, 
                  v.filepath AS video_filepath,
-                 v.thumbnail_path AS video_thumbnail, 
+                 COALESCE(
+                 v.thumbnail_path,
+                 (SELECT v2.thumbnail_path FROM playlist_videos pv2 JOIN videos v2 ON pv2.video_id = v2.id WHERE pv2.playlist_id = s.video_id AND v2.thumbnail_path IS NOT NULL ORDER BY pv2.position ASC LIMIT 1)
+               ) AS video_thumbnail, 
                  v.duration AS video_duration,
                  v.resolution AS video_resolution,  
                  v.bitrate AS video_bitrate,        
@@ -474,7 +480,10 @@ class Stream {
         `SELECT s.*, 
                 v.title AS video_title, 
                 v.filepath AS video_filepath, 
-                v.thumbnail_path AS video_thumbnail, 
+                COALESCE(
+                 v.thumbnail_path,
+                 (SELECT v2.thumbnail_path FROM playlist_videos pv2 JOIN videos v2 ON pv2.video_id = v2.id WHERE pv2.playlist_id = s.video_id AND v2.thumbnail_path IS NOT NULL ORDER BY pv2.position ASC LIMIT 1)
+               ) AS video_thumbnail, 
                 v.duration AS video_duration,
                 p.name AS playlist_name,
                 CASE 
@@ -517,7 +526,10 @@ class Stream {
         SELECT s.*, 
                v.title AS video_title, 
                v.filepath AS video_filepath,
-               v.thumbnail_path AS video_thumbnail, 
+               COALESCE(
+                 v.thumbnail_path,
+                 (SELECT v2.thumbnail_path FROM playlist_videos pv2 JOIN videos v2 ON pv2.video_id = v2.id WHERE pv2.playlist_id = s.video_id AND v2.thumbnail_path IS NOT NULL ORDER BY pv2.position ASC LIMIT 1)
+               ) AS video_thumbnail, 
                v.duration AS video_duration,
                v.resolution AS video_resolution,
                v.bitrate AS video_bitrate,

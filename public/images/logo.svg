@@ -1,23 +1,24 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
-<!-- Creator: CorelDRAW -->
-<svg xmlns="http://www.w3.org/2000/svg" xml:space="preserve" width="12.7923mm" height="11.7711mm" version="1.1" style="shape-rendering:geometricPrecision; text-rendering:geometricPrecision; image-rendering:optimizeQuality; fill-rule:evenodd; clip-rule:evenodd"
-viewBox="0 0 4.26 3.92"
- xmlns:xlink="http://www.w3.org/1999/xlink"
- xmlns:xodm="http://www.corel.com/coreldraw/odm/2003">
- <defs>
-  <style type="text/css">
-   <![CDATA[
-    .fil0 {fill:url(#id0)}
-   ]]>
-  </style>
-  <linearGradient id="id0" gradientUnits="userSpaceOnUse" x1="3.18" y1="3.78" x2="1.85" y2="0.15">
-   <stop offset="0" style="stop-opacity:1; stop-color:#0048FF"/>
-   <stop offset="1" style="stop-opacity:1; stop-color:#6BB0FF"/>
-  </linearGradient>
- </defs>
- <g id="Layer_x0020_1">
-  <metadata id="CorelCorpID_0Corel-Layer"/>
-  <path class="fil0" d="M1.18 3.92l-0.2 0 -0.2 0 -0.59 0c-0.1,0 -0.18,-0.09 -0.18,-0.19l0 -0.68c0,-0.11 0.08,-0.19 0.18,-0.19l0.59 0 0.2 0 1.16 0c0,-0.59 0.43,-1.06 0.96,-1.06l0.09 0 0 -0 0.88 0c0.1,0 0.18,0.09 0.18,0.19l0 0.68c0,0.11 -0.08,0.19 -0.18,0.19l-0.02 0 -0.04 0 -0.04 0 -0.04 0 -1.8 0c0,0.59 -0.43,1.06 -0.96,1.06zm2.1 -3.92l0.79 0c0.1,0 0.18,0.09 0.18,0.19l0 0.68c0,0.11 -0.08,0.19 -0.18,0.19l-0.02 0 -0.04 0 -0.04 0 -0.04 0 -1.8 0c0,0.59 -0.43,1.06 -0.96,1.06l-0.2 0 -0.2 0 -0.59 0c-0.1,0 -0.18,-0.09 -0.18,-0.19l0 -0.68c0,-0.11 0.08,-0.19 0.18,-0.19l0.59 0 0.2 0 1.16 0c0,-0.59 0.43,-1.06 0.96,-1.06l0.09 0 0.09 0zm0 2.86l0.11 0 0.1 0 0.09 0 0.09 0 0.08 0 0.07 0 0.07 0 0.06 0 0.05 0 0.05 0 0.02 0m-0.79 -1.8l0.11 0 0.1 0 0.09 0 0.09 0 0.08 0 0.07 0 0.07 0 0.06 0 0.05 0 0.05 0 0.02 0"/>
- </g>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100" height="100">
+  <defs>
+    <linearGradient id="simaGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#6366F1"/>
+      <stop offset="50%" stop-color="#8B5CF6"/>
+      <stop offset="100%" stop-color="#EC4899"/>
+    </linearGradient>
+    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="4" result="blur" />
+      <feComposite in="SourceGraphic" in2="blur" operator="over" />
+    </filter>
+  </defs>
+  <!-- Background Rounded Badge -->
+  <rect x="6" y="6" width="88" height="88" rx="24" fill="#1E1E2E" stroke="url(#simaGrad)" stroke-width="4"/>
+  <!-- Stylized Letter S with Stream Play Waves -->
+  <path d="M66 32 C62 25, 48 24, 39 28 C28 33, 27 46, 38 50 L56 56 C68 60, 68 73, 58 78 C47 83, 33 80, 28 72" 
+        fill="none" 
+        stroke="url(#simaGrad)" 
+        stroke-width="9" 
+        stroke-linecap="round" 
+        stroke-linejoin="round"/>
+  <!-- Streaming Play Triangle Accent -->
+  <polygon points="70,47 70,57 79,52" fill="#EC4899" filter="url(#glow)"/>
 </svg>

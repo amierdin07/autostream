@@ -2538,7 +2538,7 @@
       card.dataset.streamId = stream.id;
       card.dataset.streamData = JSON.stringify(stream);
       const youtubeConnected = <%= typeof youtubeConnected !== 'undefined' && youtubeConnected ? 'true' : 'false' %>;
-      let thumbnail = stream.video_type === 'playlist' ? '/images/playlist-thumbnail.svg' : (stream.video_thumbnail || '/images/default-video-thumbnail.svg');
+      let thumbnail = (stream.video_thumbnail || (stream.video_type === 'playlist' ? '/images/playlist-thumbnail.svg' : '/images/default-video-thumbnail.svg'));
       if (stream.youtube_thumbnail) thumbnail = stream.youtube_thumbnail;
       let durationDisplay = '';
       if (stream.status === 'live' && stream.start_time) {
@@ -2656,9 +2656,7 @@
       row.dataset.streamId = stream.id;
       row.dataset.streamData = JSON.stringify(stream);
       const youtubeConnected = <%= typeof youtubeConnected !== 'undefined' && youtubeConnected ? 'true' : 'false' %>;
-      let thumbnail = stream.video_type === 'playlist' ? 
-        '/images/playlist-thumbnail.svg' : 
-        (stream.video_thumbnail || '/images/default-video-thumbnail.svg');
+      let thumbnail = (stream.video_thumbnail || (stream.video_type === 'playlist' ? '/images/playlist-thumbnail.svg' : '/images/default-video-thumbnail.svg'));
       if (stream.youtube_thumbnail) {
         thumbnail = stream.youtube_thumbnail;
       }

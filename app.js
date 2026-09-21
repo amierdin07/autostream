@@ -66,10 +66,10 @@ app.locals.helpers = {
     if (req.session && req.session.userId) {
       const avatarPath = req.session.avatar_path;
       if (avatarPath) {
-        return `<img src="${avatarPath}" alt="${req.session.username || 'User'}'s Profile" class="w-full h-full object-cover" onerror="this.onerror=null; this.src='/images/default-avatar.jpg';">`;
+        return `<img src="${avatarPath}" alt="${req.session.username || 'User'}'s Profile" class="w-full h-full object-cover" onerror="this.onerror=null; this.src='/images/default-avatar.svg?v=2.0';">`;
       }
     }
-    return '<img src="/images/default-avatar.jpg" alt="Default Profile" class="w-full h-full object-cover">';
+    return '<img src="/images/default-avatar.svg?v=2.0" alt="Default Profile" class="w-full h-full object-cover">';
   },
   getPlatformIcon: function (platform) {
     switch (platform) {
@@ -1376,7 +1376,8 @@ app.post('/api/users/update', isAdmin, upload.single('avatar'), async (req, res)
       user_role: role || user.user_role,
       status: status || user.status,
       avatar_path: avatarPath,
-      disk_limit: diskLimit !== undefined && diskLimit !== '' ? parseInt(diskLimit) : user.disk_limit
+      disk_limit: diskLimit !== undefined && diskLimit !== '' ? parseInt(diskLimit) : user.disk_limit,
+      live_limit: liveLimit !== undefined && liveLimit !== '' ? parseInt(liveLimit) : (user.live_limit || 0)
     };
 
     if (password && password.trim() !== '') {
@@ -1401,7 +1402,7 @@ app.post('/api/users/update', isAdmin, upload.single('avatar'), async (req, res)
 
 app.post('/api/users/create', isAdmin, upload.single('avatar'), async (req, res) => {
   try {
-    const { username, role, status, password, diskLimit } = req.body;
+    const { username, role, status, password, diskLimit, liveLimit } = req.body;
     
     if (!username || !password) {
       return res.status(400).json({
@@ -1429,7 +1430,8 @@ app.post('/api/users/create', isAdmin, upload.single('avatar'), async (req, res)
       user_role: role || 'user',
       status: status || 'active',
       avatar_path: avatarPath,
-      disk_limit: diskLimit ? parseInt(diskLimit) : 0
+      disk_limit: diskLimit ? parseInt(diskLimit) : 0,
+      live_limit: liveLimit ? parseInt(liveLimit) : 0
     };
 
     const result = await User.create(userData);
@@ -2204,6 +2206,49 @@ app.delete('/api/videos/chunk/:uploadId', isAuthenticated, async (req, res) => {
     res.status(500).json({ success: false, error: 'Failed to cleanup upload' });
   }
 });
+app.delete('/api/videos/batch', isAuthenticated, async (req, res) => {
+  try {
+    const ids = Array.isArray(req.body?.ids) ? req.body.ids.filter(Boolean) : [];
+    const uniqueIds = [...new Set(ids)];
+
+    if (uniqueIds.length === 0) {
+      return res.status(400).json({ success: false, error: 'No media selected' });
+    }
+
+    const videos = [];
+    for (const id of uniqueIds) {
+      const v = await Video.findById(id);
+      if (v && v.user_id === req.session.userId) {
+        videos.push(v);
+      }
+    }
+
+    if (videos.length === 0) {
+      return res.status(404).json({ success: false, error: 'No valid media found to delete' });
+    }
+
+    const videoMap = new Map(videos.map(v => [v.id, v]));
+    const conflicts = await findLiveStreamConflictsForVideos(req.session.userId, videos.map(v => v.id));
+    if (conflicts.length > 0) {
+      return res.status(409).json({
+        success: false,
+        error: buildDeleteBlockedMessage(conflicts, videoMap, 'file')
+      });
+    }
+
+    let deleted = 0;
+    for (const v of videos) {
+      await Video.delete(v.id);
+      deleted++;
+    }
+
+    res.json({ success: true, message: `${deleted} item(s) deleted successfully`, deletedCount: deleted });
+  } catch (error) {
+    console.error('Error batch deleting videos:', error);
+    res.status(500).json({ success: false, error: 'Failed to batch delete media' });
+  }
+});
+
 app.delete('/api/videos/:id', isAuthenticated, async (req, res) => {
   try {
     const videoId = req.params.id;
@@ -3789,7 +3834,27 @@ app.get('/api/streams/:id', isAuthenticated, async (req, res) => {
           const accessToken = decrypt(user.youtube_access_token);
           const refreshToken = decrypt(user.youtube_refresh_token);
           
-          const protocol = req.headers['x-forwarded-proto'] || req.protocol;
+                // Check User Live Limit
+      if (req.user && req.user.user_role !== 'admin') {
+        const streamOwner = await User.findById(stream.user_id);
+        if (streamOwner && streamOwner.live_limit > 0) {
+          const activeCountRow = await new Promise((res, rej) => {
+            db.get(
+              "SELECT COUNT(*) as count FROM streams WHERE user_id = ? AND status = 'live' AND id != ?",
+              [stream.user_id, streamId],
+              (err, row) => err ? rej(err) : res(row)
+            );
+          });
+          if (activeCountRow && activeCountRow.count >= streamOwner.live_limit) {
+            return res.status(403).json({
+              success: false,
+              error: `Batas live streaming tercapai (Maksimal: ${streamOwner.live_limit} live stream aktif). Silakan hentikan live yang sedang berjalan terlebih dahulu.`
+            });
+          }
+        }
+      }
+
+      const protocol = req.headers['x-forwarded-proto'] || req.protocol;
           const host = req.headers['x-forwarded-host'] || req.get('host');
           const redirectUri = `${protocol}://${host}/auth/youtube/callback`;
           
@@ -3914,7 +3979,27 @@ app.put('/api/streams/:id', isAuthenticated, uploadThumbnail.single('thumbnail')
               const accessToken = decrypt(selectedChannel.access_token);
               const refreshToken = decrypt(selectedChannel.refresh_token);
               
-              const protocol = req.headers['x-forwarded-proto'] || req.protocol;
+                    // Check User Live Limit
+      if (req.user && req.user.user_role !== 'admin') {
+        const streamOwner = await User.findById(stream.user_id);
+        if (streamOwner && streamOwner.live_limit > 0) {
+          const activeCountRow = await new Promise((res, rej) => {
+            db.get(
+              "SELECT COUNT(*) as count FROM streams WHERE user_id = ? AND status = 'live' AND id != ?",
+              [stream.user_id, streamId],
+              (err, row) => err ? rej(err) : res(row)
+            );
+          });
+          if (activeCountRow && activeCountRow.count >= streamOwner.live_limit) {
+            return res.status(403).json({
+              success: false,
+              error: `Batas live streaming tercapai (Maksimal: ${streamOwner.live_limit} live stream aktif). Silakan hentikan live yang sedang berjalan terlebih dahulu.`
+            });
+          }
+        }
+      }
+
+      const protocol = req.headers['x-forwarded-proto'] || req.protocol;
               const host = req.headers['x-forwarded-host'] || req.get('host');
               const redirectUri = `${protocol}://${host}/auth/youtube/callback`;
               
@@ -4229,6 +4314,26 @@ app.post('/api/streams/:id/status', isAuthenticated, [
           stream
         });
       }
+            // Check User Live Limit
+      if (req.user && req.user.user_role !== 'admin') {
+        const streamOwner = await User.findById(stream.user_id);
+        if (streamOwner && streamOwner.live_limit > 0) {
+          const activeCountRow = await new Promise((res, rej) => {
+            db.get(
+              "SELECT COUNT(*) as count FROM streams WHERE user_id = ? AND status = 'live' AND id != ?",
+              [stream.user_id, streamId],
+              (err, row) => err ? rej(err) : res(row)
+            );
+          });
+          if (activeCountRow && activeCountRow.count >= streamOwner.live_limit) {
+            return res.status(403).json({
+              success: false,
+              error: `Batas live streaming tercapai (Maksimal: ${streamOwner.live_limit} live stream aktif). Silakan hentikan live yang sedang berjalan terlebih dahulu.`
+            });
+          }
+        }
+      }
+
       const protocol = req.headers['x-forwarded-proto'] || req.protocol;
       const host = req.headers['x-forwarded-host'] || req.get('host');
       const baseUrl = `${protocol}://${host}`;

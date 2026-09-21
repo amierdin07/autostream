@@ -117,7 +117,7 @@
                   </div>
                   <div class="flex items-center">
                     <span class="inline-flex px-1.5 py-0.5 text-xs rounded-md bg-gray-600 text-gray-200">
-                      <%= user.activeStreamCount || 0 %> online
+                      <%= user.activeStreamCount || 0 %> online <% if (user.live_limit > 0) { %><span class='text-xs text-gray-500'>(Max: <%= user.live_limit %>)</span><% } %>
                     </span>
                   </div>
                 </div>
@@ -127,7 +127,7 @@
               </td>
               <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
                 <div class="flex space-x-2">
-                  <button onclick="editUser('<%= user.id %>', '<%= user.username %>', '<%= user.user_role %>', '<%= user.status %>', '<%= user.avatar_path || '' %>', '<%= user.disk_limit || 0 %>')" 
+                  <button onclick="editUser('<%= user.id %>', '<%= user.username %>', '<%= user.user_role %>', '<%= user.status %>', '<%= user.avatar_path || '' %>', '<%= user.disk_limit || 0 %>', '<%= user.live_limit || 0 %>')" 
                     class="text-blue-400 hover:text-blue-300 transition-colors" title="Edit User">
                     <i class="ti ti-edit"></i>
                   </button>
@@ -219,6 +219,12 @@
           </div>
 
           <div class="mb-4">
+            <label for="editLiveLimit" class="block text-sm font-medium text-gray-300 mb-2">Live Limit (Maksimal Live Aktif)</label>
+            <input type="number" id="editLiveLimit" name="liveLimit" min="0" step="1" placeholder="0"
+              class="w-full bg-dark-700 border border-gray-600 text-white px-3 py-2 rounded-lg focus:outline-none focus:ring-1 focus:ring-primary">
+            <p class="text-xs text-gray-500 mt-1">Set ke 0 untuk unlimited live stream</p>
+          </div>
+          <div class="mb-4">
             <label for="editDiskLimit" class="block text-sm font-medium text-gray-300 mb-2">Disk Limit</label>
             <div class="flex gap-2">
               <input type="number" id="editDiskLimitValue" min="0" step="1" placeholder="0"
@@ -309,6 +315,12 @@
             </select>
           </div>
 
+          <div class="mb-4">
+            <label for="createLiveLimit" class="block text-sm font-medium text-gray-300 mb-2">Live Limit (Maksimal Live Aktif)</label>
+            <input type="number" id="createLiveLimit" name="liveLimit" min="0" step="1" placeholder="0"
+              class="w-full bg-dark-700 border border-gray-600 text-white px-3 py-2 rounded-lg focus:outline-none focus:ring-1 focus:ring-primary">
+            <p class="text-xs text-gray-500 mt-1">Set ke 0 untuk unlimited live stream</p>
+          </div>
           <div class="mb-4">
             <label for="createDiskLimit" class="block text-sm font-medium text-gray-300 mb-2">Disk Limit</label>
             <div class="flex gap-2">
@@ -494,7 +506,8 @@ function showToast(message, type = 'success') {
   }, 3000);
 }
 
-function openEditModal(userId, username, role, status, avatar, diskLimit) {
+function openEditModal(userId, username, role, status, avatar, diskLimit, liveLimit) {
+  document.getElementById('editLiveLimit').value = liveLimit || 0;
   document.getElementById('editUserId').value = userId;
   document.getElementById('editUsername').value = username;
   document.getElementById('editRole').value = role;
@@ -538,6 +551,7 @@ function openEditModal(userId, username, role, status, avatar, diskLimit) {
 }
 
 function openCreateModal() {
+  document.getElementById('createLiveLimit').value = '0';
   document.getElementById('createUsername').value = '';
   document.getElementById('createRole').value = 'member';
   document.getElementById('createStatus').value = 'active';
@@ -575,8 +589,8 @@ function closeCreateModal() {
   }, 200);
 }
 
-function editUser(userId, username, role, status, avatarPath, diskLimit) {
-  openEditModal(userId, username, role, status, avatarPath, diskLimit);
+function editUser(userId, username, role, status, avatarPath, diskLimit, liveLimit) {
+  openEditModal(userId, username, role, status, avatarPath, diskLimit, liveLimit);
 }
 
 function closeEditModal() {
