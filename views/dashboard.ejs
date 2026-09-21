@@ -2301,7 +2301,7 @@
           <div class="flex flex-col gap-1">
             <div class="flex items-center gap-2">
               <span class="flex items-center bg-red-400/10 text-red-400 rounded-full px-2.5 py-1 w-fit">
-                <span class="w-1.5 h-1.5 rounded-full bg-red-400 animate-pulse mr-1.5"></span>
+                <span class="live-pulse-dot mr-1.5"></span>
                 <span class="text-xs font-medium">Live${duration ? ' • ' + duration : ''}</span>
               </span>
               ${streamId ? `<span class="stream-cpu-badge hidden text-[10px] text-gray-400 bg-dark-700 px-1.5 py-0.5 rounded border border-gray-600" data-stream-id="${streamId}">CPU: 0%</span>` : ''}
@@ -2711,7 +2711,7 @@
           <div class="flex flex-col gap-1.5">
             <div class="flex items-center gap-2">
               <span class="flex items-center w-fit bg-red-400/10 text-red-400 rounded-full px-2.5 py-1">
-                <span class="w-1.5 h-1.5 rounded-full bg-red-400 animate-pulse mr-1.5"></span>
+                <span class="live-pulse-dot mr-1.5"></span>
                 <span class="text-xs font-medium">Live • <span class="live-duration tabular-nums" data-start-time="${stream.start_time}">
                   ${durationDisplay}</span></span>
               </span>
