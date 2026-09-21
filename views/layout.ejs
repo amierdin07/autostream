@@ -70,6 +70,50 @@
        });
      }
    </script>
+
+<style id="theme-style">
+  html.light-mode { color-scheme: light; }
+  html.light-mode body { background-color: #F3F4F6 !important; color: #1F2937 !important; }
+  html.light-mode .bg-dark-900 { background-color: #F9FAFB !important; color: #111827 !important; }
+  html.light-mode .bg-dark-800 { background-color: #FFFFFF !important; color: #1F2937 !important; border-color: #E5E7EB !important; }
+  html.light-mode .bg-dark-700 { background-color: #F3F4F6 !important; color: #1F2937 !important; border-color: #E5E7EB !important; }
+  html.light-mode .bg-dark-600 { background-color: #E5E7EB !important; color: #111827 !important; }
+  html.light-mode .text-white { color: #111827 !important; }
+  html.light-mode .text-gray-300, html.light-mode .text-gray-200 { color: #374151 !important; }
+  html.light-mode .text-gray-400 { color: #4B5563 !important; }
+  html.light-mode .text-gray-500 { color: #6B7280 !important; }
+  html.light-mode .border-gray-700, html.light-mode .border-gray-600 { border-color: #E5E7EB !important; }
+  html.light-mode .bg-gray-800 { background-color: #FFFFFF !important; border: 1px solid #E5E7EB; color: #1F2937 !important; }
+  html.light-mode .bg-gray-700 { background-color: #E5E7EB !important; color: #1F2937 !important; }
+  html.light-mode tr:hover { background-color: rgba(99, 102, 241, 0.05) !important; }
+  html.light-mode input, html.light-mode select, html.light-mode textarea { background-color: #FFFFFF !important; color: #111827 !important; border-color: #D1D5DB !important; }
+  html.light-mode .sidebar-icon { color: #4B5563 !important; }
+  html.light-mode .sidebar-icon:hover { background-color: #EEF2FF !important; color: #4F46E5 !important; }
+  html.light-mode .sidebar-icon.bg-primary { background-color: #6366F1 !important; color: #FFFFFF !important; }
+</style>
+<script>
+  (function() {
+    var savedTheme = localStorage.getItem("simastream_theme");
+    if (savedTheme === "light") {
+      document.documentElement.classList.add("light-mode");
+    }
+  })();
+  function toggleTheme() {
+    var html = document.documentElement;
+    var isLight = html.classList.toggle("light-mode");
+    localStorage.setItem("simastream_theme", isLight ? "light" : "dark");
+    updateThemeIcons();
+  }
+  function updateThemeIcons() {
+    var isLight = document.documentElement.classList.contains("light-mode");
+    var icons = document.querySelectorAll(".theme-toggle-icon");
+    for (var i = 0; i < icons.length; i++) {
+      icons[i].className = isLight ? "ti ti-moon text-lg theme-toggle-icon" : "ti ti-sun text-lg theme-toggle-icon";
+    }
+  }
+  document.addEventListener("DOMContentLoaded", updateThemeIcons);
+</script>
+
 </head>
 <body class="bg-dark-900 text-white font-inter">
   <div
@@ -88,6 +132,7 @@
          class="p-2 text-gray-400 hover:text-white transition-colors">
         <i class="ti ti-gift text-lg"></i>
       </a>
+      <button type="button" onclick="toggleTheme()" class="p-2 text-gray-400 hover:text-yellow-400 transition-colors cursor-pointer" title="Toggle Mode"><i class="ti ti-sun text-lg theme-toggle-icon"></i></button>
       <button id="mobile-quick-notes-btn" onclick="toggleQuickNotesDrawer()" 
          class="p-2 text-yellow-400 hover:text-yellow-300 transition-colors" title="Catatan & SEO Snippets">
         <i class="ti ti-notes text-lg"></i>
@@ -207,6 +252,7 @@
           <span id="server-clock" class="tabular-nums">--:--:--</span>
         </div>
         <div class="h-4 w-px bg-gray-600 mr-4"></div>
+        <button type="button" onclick="toggleTheme()" class="p-2 text-gray-400 hover:text-yellow-400 transition-colors mr-1 cursor-pointer" title="Toggle Light/Dark Mode"><i class="ti ti-sun text-lg theme-toggle-icon"></i></button>
         <button id="quick-notes-btn" onclick="toggleQuickNotesDrawer()"
           class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-dark-700 hover:bg-dark-600 border border-gray-700 hover:border-gray-600 text-gray-200 hover:text-white transition-all text-xs font-medium mr-2 group shadow-sm active:scale-95 cursor-pointer"
           title="Catatan & SEO Snippets">
