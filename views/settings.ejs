@@ -569,6 +569,58 @@
         </form>
       </div>
 
+      <div class="bg-gray-800 rounded-lg p-6 max-w-3xl" id="network-usage-setting">
+        <div class="flex items-center justify-between mb-6">
+          <div>
+            <h3 class="text-lg font-semibold text-white">Reset Pemakaian Data / Bandwidth</h3>
+            <p class="text-sm text-gray-400 mt-1">Atur tanggal siklus reset otomatis pemakaian kuota data (Usage) setiap bulannya.</p>
+          </div>
+          <div class="w-10 h-10 bg-dark-700 rounded-lg flex items-center justify-center text-primary">
+            <i class="ti ti-wifi text-xl"></i>
+          </div>
+        </div>
+
+        <form id="network-reset-day-form" class="space-y-6" action="/api/settings/network-reset-day" method="post">
+          <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+          
+          <div class="space-y-2">
+            <label for="reset_day" class="block text-sm font-medium text-gray-300">Tanggal Reset Bulanan</label>
+            <div class="flex items-center gap-3">
+              <div class="relative w-40">
+                <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-gray-400">
+                  <i class="ti ti-calendar-event"></i>
+                </span>
+                <input type="number" id="reset_day" name="reset_day" min="1" max="31"
+                  class="bg-dark-900 text-white pl-10 pr-3 py-2 rounded-lg block w-full focus:outline-none focus:ring-1 focus:ring-primary font-semibold"
+                  value="<%= typeof networkResetDay !== 'undefined' ? networkResetDay : 15 %>" required>
+              </div>
+              <span class="text-sm text-gray-400">Setiap tanggal <b><span id="current-reset-day-label"><%= typeof networkResetDay !== 'undefined' ? networkResetDay : 15 %></span></b> pukul 00:00:00</span>
+            </div>
+            <p class="text-sm text-gray-400">Pilih tanggal antara 1 sampai 31 (misalnya tanggal jatuh tempo / billing cycle VPS Anda). Pemakaian kuota di dashboard akan otomatis di-reset ke 0 B pada tanggal ini setiap bulan.</p>
+          </div>
+          
+          <div class="pt-2">
+            <button type="submit"
+              class="px-4 py-2 bg-primary hover:bg-blue-600 text-white rounded-lg transition-colors font-medium inline-flex items-center gap-2">
+              <i class="ti ti-device-floppy"></i> Simpan Tanggal Reset
+            </button>
+          </div>
+        </form>
+
+        <div class="mt-8 pt-6 border-t border-gray-700/60 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <h4 class="text-sm font-semibold text-white">Reset Manual Sekarang</h4>
+            <p class="text-xs text-gray-400 mt-0.5">Kosongkan akumulasi data Upload & Download saat ini menjadi 0 B tanpa menunggu tanggal reset bulanan.</p>
+          </div>
+          <form action="/api/settings/reset-network-usage" method="post" onsubmit="return confirm('Apakah Anda yakin ingin me-reset data pemakaian kuota saat ini ke 0 B?')">
+            <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+            <button type="submit" class="px-4 py-2 bg-red-500/20 hover:bg-red-500/30 text-red-400 border border-red-500/30 rounded-lg text-sm font-semibold transition-colors flex items-center gap-2 whitespace-nowrap">
+              <i class="ti ti-refresh text-base"></i> Reset Kuota Sekarang
+            </button>
+          </form>
+        </div>
+      </div>
+
       <div class="bg-gray-800 rounded-lg p-6 max-w-3xl">
         <h3 class="text-lg font-semibold mb-6">Telegram Notification Settings</h3>
         <form id="telegram-settings-form" class="space-y-6" action="/api/settings/telegram" method="post">

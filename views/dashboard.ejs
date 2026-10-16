@@ -38,7 +38,7 @@
     <div class="flex items-center justify-between gap-2 overflow-x-auto scrollbar-hide">
       <div class="flex items-center gap-1.5 flex-shrink-0">
         <i class="ti ti-broadcast text-primary text-sm font-loaded"></i>
-        <span class="text-xs font-bold text-white">0</span>
+        <span class="text-xs font-bold text-white" id="mobile-active-streams-counter">0</span>
         <span class="text-[10px] text-gray-400">live</span>
       </div>
       <div class="w-px h-4 bg-gray-700 flex-shrink-0"></div>
@@ -76,7 +76,7 @@
           <i class="ti ti-broadcast text-xl text-white font-loaded"></i>
         </div>
       </div>      
-      <p class="text-3xl font-bold mt-2">0</p>
+      <p class="text-3xl font-bold mt-2" id="desktop-active-streams-counter">0</p>
     </div>
     <div class="stat-card-violet rounded-lg p-6 shadow-lg">
       <div class="flex items-center justify-between">
@@ -137,7 +137,12 @@
           <span id="download-speed" class="text-lg font-bold text-green-400">0 Mbps</span>
         </div>
         <div class="flex justify-between items-center pt-2 border-t border-gray-700/50 mt-2">
-          <span class="text-xs text-gray-500">Usage</span>
+          <div class="flex items-center gap-1.5 cursor-pointer group" onclick="openNetworkUsageModal()" title="Klik untuk atur tanggal reset kuota">
+            <span class="text-xs text-gray-500 group-hover:text-primary transition-colors">Usage</span>
+            <span class="text-[10px] text-primary bg-primary/10 border border-primary/25 px-1.5 py-0.5 rounded group-hover:bg-primary group-hover:text-white transition-all flex items-center gap-1" id="usage-reset-badge">
+              Rst <span id="usage-badge-day">15</span> <i class="ti ti-pencil text-[9px] opacity-70"></i>
+            </span>
+          </div>
           <div class="text-xs space-x-2">
             <span id="total-upload" class="text-blue-400/70" title="Total Upload">↑ 0 B</span>
             <span id="total-download" class="text-green-400/70" title="Total Download">↓ 0 B</span>
@@ -170,7 +175,12 @@
           <span id="download-speed-wide" class="text-lg font-bold text-green-400">0 Mbps</span>
         </div>
         <div class="flex justify-between items-center pt-2 border-t border-gray-700/50 mt-2">
-          <span class="text-xs text-gray-500">Usage</span>
+          <div class="flex items-center gap-1.5 cursor-pointer group" onclick="openNetworkUsageModal()" title="Klik untuk atur tanggal reset kuota">
+            <span class="text-xs text-gray-500 group-hover:text-primary transition-colors">Usage</span>
+            <span class="text-[10px] text-primary bg-primary/10 border border-primary/25 px-1.5 py-0.5 rounded group-hover:bg-primary group-hover:text-white transition-all flex items-center gap-1" id="usage-reset-badge-wide">
+              Rst <span id="usage-badge-day-wide">15</span> <i class="ti ti-pencil text-[9px] opacity-70"></i>
+            </span>
+          </div>
           <div class="text-xs space-x-2">
             <span id="total-upload-wide" class="text-blue-400/70" title="Total Upload">↑ 0 B</span>
             <span id="total-download-wide" class="text-green-400/70" title="Total Download">↓ 0 B</span>
@@ -269,9 +279,83 @@
       </div>
     </div>
   </div>
+  <!-- Modal Atur Tanggal Reset Kuota / Bandwidth -->
+  <div id="networkUsageModal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-dark-800 rounded-2xl border border-gray-700/80 shadow-2xl w-full max-w-md p-6 relative" style="background: #17112c !important;">
+      <div class="flex items-center justify-between pb-4 border-b border-gray-700/60 mb-5">
+        <div class="flex items-center gap-2.5">
+          <div class="w-9 h-9 rounded-xl bg-primary/20 flex items-center justify-center text-primary">
+            <i class="ti ti-wifi text-lg"></i>
+          </div>
+          <div>
+            <h3 class="text-base font-semibold text-white">Atur Tanggal Reset Kuota</h3>
+            <p class="text-xs text-gray-400">Pengaturan siklus bulanan data usage</p>
+          </div>
+        </div>
+        <button type="button" onclick="closeNetworkUsageModal()" class="text-gray-400 hover:text-white p-1 rounded-lg hover:bg-dark-700 transition-colors">
+          <i class="ti ti-x text-xl"></i>
+        </button>
+      </div>
+
+      <!-- Current Stats summary -->
+      <div class="bg-dark-900/70 border border-gray-700/60 rounded-xl p-3.5 mb-5 space-y-2">
+        <div class="flex justify-between text-xs">
+          <span class="text-gray-400">Siklus Aktif:</span>
+          <span class="text-white font-medium" id="modal-cycle-info">--</span>
+        </div>
+        <div class="flex justify-between text-xs">
+          <span class="text-gray-400">Total Upload:</span>
+          <span class="text-blue-400 font-semibold" id="modal-total-upload">--</span>
+        </div>
+        <div class="flex justify-between text-xs">
+          <span class="text-gray-400">Total Download:</span>
+          <span class="text-green-400 font-semibold" id="modal-total-download">--</span>
+        </div>
+      </div>
+
+      <!-- Form change reset day -->
+      <form id="modal-reset-day-form" onsubmit="saveNetworkResetDay(event)" class="space-y-4">
+        <div>
+          <label for="modal-reset-day-input" class="block text-xs font-medium text-gray-300 mb-1.5">
+            Reset Otomatis Setiap Tanggal (1 - 31):
+          </label>
+          <div class="relative">
+            <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-gray-400">
+              <i class="ti ti-calendar-event"></i>
+            </span>
+            <input type="number" id="modal-reset-day-input" min="1" max="31" required
+              class="w-full bg-dark-900 border border-gray-700 text-white pl-10 pr-4 py-2.5 rounded-xl text-sm focus:outline-none focus:ring-1 focus:ring-primary font-semibold"
+              placeholder="Contoh: 15">
+          </div>
+          <p class="text-[11px] text-gray-400 mt-1">Pemakaian data akan otomatis di-reset ke 0 pada tanggal ini setiap bulan pukul 00:00:00.</p>
+        </div>
+
+        <div class="flex items-center gap-2 pt-1">
+          <button type="submit" id="modal-save-reset-btn"
+            class="flex-1 py-2.5 px-4 bg-primary hover:bg-blue-600 text-white rounded-xl text-sm font-semibold transition-colors flex items-center justify-center gap-2">
+            <i class="ti ti-check"></i> Simpan Tanggal
+          </button>
+          <button type="button" onclick="closeNetworkUsageModal()"
+            class="py-2.5 px-4 bg-dark-700 hover:bg-dark-600 text-gray-300 rounded-xl text-sm font-medium transition-colors">
+            Batal
+          </button>
+        </div>
+      </form>
+
+      <!-- Manual Reset Button -->
+      <div class="mt-5 pt-4 border-t border-gray-700/60 flex items-center justify-between">
+        <span class="text-xs text-gray-400">Ingin kosongkan data sekarang?</span>
+        <button type="button" onclick="manualResetNetworkUsage()"
+          class="text-xs text-red-400 hover:text-red-300 hover:underline flex items-center gap-1">
+          <i class="ti ti-refresh"></i> Reset Sekarang
+        </button>
+      </div>
+    </div>
+  </div>
+
   <div id="newStreamModal" class="fixed inset-0 bg-black/50 z-50 hidden modal-overlay overflow-y-auto">
     <div class="flex min-h-screen items-center justify-center p-4">
-      <div class="bg-dark-800 rounded-lg shadow-xl w-full max-w-4xl modal-container flex flex-col max-h-[90vh]">
+      <div class="bg-dark-800 rounded-lg shadow-xl w-full max-w-5xl modal-container flex flex-col max-h-[90vh]">
         <div class="flex-shrink-0 flex items-center justify-between p-4 sm:px-6 sm:py-4 border-b border-gray-700">
           <h3 class="text-lg font-semibold">Create New Stream</h3>
           <div class="flex items-center gap-2">
@@ -284,7 +368,7 @@
             </button>
           </div>
         </div>
-        <div class="p-4 sm:px-6 pt-1 pb-4 overflow-y-auto flex-grow">
+        <div class="p-4 sm:px-6 pt-4 pb-4 overflow-y-auto flex-grow">
           <form id="newStreamForm" class="space-y-6">
             <input type="hidden" id="selectedVideoId" name="videoId" value="">
             <input type="hidden" id="streamMode" name="streamMode" value="manual">
@@ -314,7 +398,7 @@
                       <i class="ti ti-chevron-down text-gray-400"></i>
                     </button>
                     <div id="videoSelectorDropdown"
-                      class="hidden absolute z-10 mt-2 w-full bg-dark-700 rounded-lg border border-gray-600 shadow-lg">
+                      class="hidden absolute z-50 mt-2 w-full bg-dark-700 rounded-lg border border-gray-600 shadow-lg">
                       <div class="p-2 border-b border-gray-600/50">
                         <div class="relative">
                           <input type="text" id="videoSearchInput"
@@ -363,7 +447,7 @@
                         <i class="ti ti-list-check text-gray-400 hover:text-primary"></i>
                       </button>
                       <div id="platformDropdown"
-                        class="hidden absolute z-10 right-0 mt-1 w-48 bg-dark-700 rounded-lg border border-gray-600 shadow-lg overflow-hidden">
+                        class="hidden absolute z-50 right-0 mt-1 w-48 bg-dark-700 rounded-lg border border-gray-600 shadow-lg overflow-hidden">
                         <div class="py-1">
                           <button type="button"
                             class="platform-option w-full flex items-center px-4 py-2 hover:bg-dark-600" 
@@ -451,13 +535,13 @@
                 <div>
                   <label class="text-xs text-gray-400 block mb-1">Start Stream</label>
                   <input type="datetime-local" id="scheduleStartTime" name="scheduleStartTime"
-                    class="w-full h-[42px] px-4 bg-dark-700 border border-gray-600 rounded-lg focus:border-primary focus:ring-1 focus:ring-primary text-sm [color-scheme:dark]">
+                    class="w-full h-[42px] px-4 bg-dark-700 border border-gray-600 rounded-lg focus:border-primary focus:ring-1 focus:ring-primary text-sm ">
                 </div>
                 <div>
                   <label class="text-xs text-gray-400 block mb-1">Duration</label>
                   <div class="flex gap-2">
-                    <input type="number" id="durationHours" min="0" placeholder="Hrs" class="w-full h-[42px] px-2 bg-dark-700 border border-gray-600 rounded-lg focus:border-primary focus:ring-1 focus:ring-primary text-sm [color-scheme:dark]">
-                    <input type="number" id="durationMinutes" min="0" max="59" placeholder="Min" class="w-full h-[42px] px-2 bg-dark-700 border border-gray-600 rounded-lg focus:border-primary focus:ring-1 focus:ring-primary text-sm [color-scheme:dark]">
+                    <input type="number" id="durationHours" min="0" placeholder="Hrs" class="w-full h-[42px] px-2 bg-dark-700 border border-gray-600 rounded-lg focus:border-primary focus:ring-1 focus:ring-primary text-sm ">
+                    <input type="number" id="durationMinutes" min="0" max="59" placeholder="Min" class="w-full h-[42px] px-2 bg-dark-700 border border-gray-600 rounded-lg focus:border-primary focus:ring-1 focus:ring-primary text-sm ">
                   </div>
                 </div>
                 <div>
@@ -466,7 +550,7 @@
                     <span id="durationBadge" class="ml-2 bg-gray-700 text-xs text-gray-300 px-2 py-0.5 rounded hidden leading-none">00:00</span>
                   </label>
                   <input type="datetime-local" id="scheduleEndTime" name="scheduleEndTime"
-                    class="w-full h-[42px] px-4 bg-dark-700 border border-gray-600 rounded-lg focus:border-primary focus:ring-1 focus:ring-primary text-sm [color-scheme:dark]">
+                    class="w-full h-[42px] px-4 bg-dark-700 border border-gray-600 rounded-lg focus:border-primary focus:ring-1 focus:ring-primary text-sm ">
                 </div>
               </div>
             </div>
@@ -586,7 +670,7 @@
                         <span class="text-sm text-gray-300" id="ytSelectedVideo">Choose a video...</span>
                         <i class="ti ti-chevron-down text-gray-400"></i>
                       </button>
-                      <div id="ytVideoSelectorDropdown" class="hidden absolute z-10 mt-2 w-full bg-dark-700 rounded-lg border border-gray-600 shadow-lg">
+                      <div id="ytVideoSelectorDropdown" class="hidden absolute z-50 mt-2 w-full bg-dark-700 rounded-lg border border-gray-600 shadow-lg">
                         <div class="p-2 border-b border-gray-600/50">
                           <div class="relative">
                             <input type="text" id="ytVideoSearchInput" class="w-full bg-dark-800 text-white pl-8 pr-4 py-2 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-primary border border-gray-700" placeholder="Search videos...">
@@ -710,17 +794,16 @@
 
                   <div class="p-4 bg-dark-900/50 rounded-xl border border-gray-700/50 space-y-4">
                     <h4 class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Quality Settings</h4>
-                    <div class="grid grid-cols-2 gap-4">
-                      <div>
-                        <label class="text-xs text-gray-400 block mb-1">Resolution</label>
-                        <select id="ytResolution" name="ytResolution" class="w-full h-[38px] px-3 bg-dark-700 border border-gray-600 rounded-lg text-sm focus:border-primary">
-                          <option value="original" selected>Original (Auto Detect)</option>
-                          <option value="720p">720p HD</option>
-                          <option value="1080p">1080p Full HD</option>
-                          <option value="1440p">1440p QHD</option>
-                          <option value="2160p">2160p 4K</option>
-                        </select>
-                      </div>
+                    <div>
+                      <label class="text-xs text-gray-400 block mb-1">Resolution</label>
+                      <select id="ytResolution" name="ytResolution" class="w-full h-[38px] px-3 bg-dark-700 border border-gray-600 rounded-lg text-sm focus:border-primary">
+                        <option value="original" selected>Original (Auto Detect)</option>
+                        <option value="720p">720p HD</option>
+                        <option value="1080p">1080p Full HD</option>
+                        <option value="1440p">1440p QHD</option>
+                        <option value="2160p">2160p 4K</option>
+                      </select>
+                    </div>
                     <div id="ytAdditionalQualitySettings" class="hidden space-y-4">
                       <div class="grid grid-cols-2 gap-4">
                         <div>
@@ -786,16 +869,22 @@
                     </label>
                   </div>
 
-                  <div id="ytScheduleSettings" class="hidden grid grid-cols-1 sm:grid-cols-4 gap-4">
+                  <div id="ytScheduleSettings" class="hidden grid grid-cols-1 sm:grid-cols-3 gap-3">
                     <div>
                       <label class="text-xs text-gray-400 block mb-1">Start Time</label>
-                      <input type="datetime-local" id="ytScheduleStart" name="ytScheduleStart" class="w-full h-[42px] px-4 bg-dark-700 border border-gray-600 rounded-lg focus:border-primary focus:ring-1 focus:ring-primary text-sm [color-scheme:dark]">
+                      <input type="datetime-local" id="ytScheduleStart" name="ytScheduleStart" class="w-full h-[42px] px-4 bg-dark-700 border border-gray-600 rounded-lg focus:border-primary focus:ring-1 focus:ring-primary text-sm ">
                     </div>
                     <div>
-                      <label class="text-xs text-gray-400 block mb-1">Duration</label>
+                      <label class="text-xs text-gray-500 block mb-1 font-semibold">Duration (Durasi)</label>
                       <div class="flex gap-2">
-                        <input type="number" id="ytDurationHours" min="0" placeholder="Hrs" class="w-full h-[42px] px-2 bg-dark-700 border border-gray-600 rounded-lg focus:border-primary focus:ring-1 focus:ring-primary text-sm [color-scheme:dark]">
-                        <input type="number" id="ytDurationMinutes" min="0" max="59" placeholder="Min" class="w-full h-[42px] px-2 bg-dark-700 border border-gray-600 rounded-lg focus:border-primary focus:ring-1 focus:ring-primary text-sm [color-scheme:dark]">
+                        <div class="flex-1 relative">
+                          <input type="number" id="ytDurationHours" min="0" placeholder="0" class="w-full h-[40px] pl-3 pr-7 bg-white border border-gray-300 rounded-lg text-sm font-semibold">
+                          <span class="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-gray-400 font-bold pointer-events-none">Jam</span>
+                        </div>
+                        <div class="flex-1 relative">
+                          <input type="number" id="ytDurationMinutes" min="0" max="59" placeholder="0" class="w-full h-[40px] pl-3 pr-7 bg-white border border-gray-300 rounded-lg text-sm font-semibold">
+                          <span class="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-gray-400 font-bold pointer-events-none">Mnt</span>
+                        </div>
                       </div>
                     </div>
                     <div>
@@ -803,7 +892,7 @@
                         <span>End Time</span>
                         <span id="ytDurationBadge" class="ml-2 bg-gray-700 text-xs text-gray-300 px-2 py-0.5 rounded hidden">00:00</span>
                       </label>
-                      <input type="datetime-local" id="ytScheduleEnd" name="ytScheduleEnd" class="w-full h-[42px] px-4 bg-dark-700 border border-gray-600 rounded-lg focus:border-primary focus:ring-1 focus:ring-primary text-sm [color-scheme:dark]">
+                      <input type="datetime-local" id="ytScheduleEnd" name="ytScheduleEnd" class="w-full h-[42px] px-4 bg-dark-700 border border-gray-600 rounded-lg focus:border-primary focus:ring-1 focus:ring-primary text-sm ">
                     </div>
                   </div>
                 </div>
@@ -842,7 +931,7 @@
   </div>
   <div id="editStreamModal" class="fixed inset-0 bg-black/50 z-50 hidden modal-overlay overflow-y-auto">
     <div class="flex min-h-screen items-center justify-center p-4">
-      <div class="bg-dark-800 rounded-lg shadow-xl w-full max-w-4xl modal-container flex flex-col max-h-[90vh]">
+      <div class="bg-dark-800 rounded-lg shadow-xl w-full max-w-5xl modal-container flex flex-col max-h-[90vh]">
         <div class="flex-shrink-0 flex items-center justify-between p-4 sm:px-6 sm:py-4 border-b border-gray-700">
           <h3 class="text-lg font-semibold">Edit Stream</h3>
           <div class="flex items-center gap-2">
@@ -855,7 +944,7 @@
             </button>
           </div>
         </div>
-        <div class="p-4 sm:px-6 pt-1 pb-4 overflow-y-auto flex-grow">
+        <div class="p-4 sm:px-6 pt-4 pb-4 overflow-y-auto flex-grow">
           <form id="editStreamForm" class="space-y-6">
             <input type="hidden" id="editStreamId" name="streamId" value="">
             <input type="hidden" id="editSelectedVideoId" name="videoId" value="">
@@ -886,7 +975,7 @@
                       <i class="ti ti-chevron-down text-gray-400"></i>
                     </button>
                     <div id="editVideoSelectorDropdown"
-                      class="hidden absolute z-10 mt-2 w-full bg-dark-700 rounded-lg border border-gray-600 shadow-lg">
+                      class="hidden absolute z-50 mt-2 w-full bg-dark-700 rounded-lg border border-gray-600 shadow-lg">
                       <div class="p-2 border-b border-gray-600/50">
                         <div class="relative">
                           <input type="text" id="editVideoSearchInput"
@@ -935,7 +1024,7 @@
                         <i class="ti ti-list-check text-gray-400 hover:text-primary"></i>
                       </button>
                       <div id="editPlatformDropdown"
-                        class="hidden absolute z-10 right-0 mt-1 w-48 bg-dark-700 rounded-lg border border-gray-600 shadow-lg overflow-hidden">
+                        class="hidden absolute z-50 right-0 mt-1 w-48 bg-dark-700 rounded-lg border border-gray-600 shadow-lg overflow-hidden">
                         <div class="py-1">
                           <button type="button"
                             class="platform-option w-full flex items-center px-4 py-2 hover:bg-dark-600" 
@@ -1023,13 +1112,13 @@
                 <div>
                   <label class="text-xs text-gray-400 block mb-1">Start Stream</label>
                   <input type="datetime-local" id="editScheduleStartTime" name="scheduleStartTime"
-                    class="w-full h-[42px] px-4 bg-dark-700 border border-gray-600 rounded-lg focus:border-primary focus:ring-1 focus:ring-primary text-sm [color-scheme:dark]">
+                    class="w-full h-[42px] px-4 bg-dark-700 border border-gray-600 rounded-lg focus:border-primary focus:ring-1 focus:ring-primary text-sm ">
                 </div>
                 <div>
                   <label class="text-xs text-gray-400 block mb-1">Duration</label>
                   <div class="flex gap-2">
-                    <input type="number" id="editDurationHours" min="0" placeholder="Hrs" class="w-full h-[42px] px-2 bg-dark-700 border border-gray-600 rounded-lg focus:border-primary focus:ring-1 focus:ring-primary text-sm [color-scheme:dark]">
-                    <input type="number" id="editDurationMinutes" min="0" max="59" placeholder="Min" class="w-full h-[42px] px-2 bg-dark-700 border border-gray-600 rounded-lg focus:border-primary focus:ring-1 focus:ring-primary text-sm [color-scheme:dark]">
+                    <input type="number" id="editDurationHours" min="0" placeholder="Hrs" class="w-full h-[42px] px-2 bg-dark-700 border border-gray-600 rounded-lg focus:border-primary focus:ring-1 focus:ring-primary text-sm ">
+                    <input type="number" id="editDurationMinutes" min="0" max="59" placeholder="Min" class="w-full h-[42px] px-2 bg-dark-700 border border-gray-600 rounded-lg focus:border-primary focus:ring-1 focus:ring-primary text-sm ">
                   </div>
                 </div>
                 <div>
@@ -1038,7 +1127,7 @@
                     <span id="editDurationBadge" class="ml-2 bg-gray-700 text-xs text-gray-300 px-2 py-0.5 rounded hidden leading-none">00:00</span>
                   </label>
                   <input type="datetime-local" id="editScheduleEndTime" name="scheduleEndTime"
-                    class="w-full h-[42px] px-4 bg-dark-700 border border-gray-600 rounded-lg focus:border-primary focus:ring-1 focus:ring-primary text-sm [color-scheme:dark]">
+                    class="w-full h-[42px] px-4 bg-dark-700 border border-gray-600 rounded-lg focus:border-primary focus:ring-1 focus:ring-primary text-sm ">
                 </div>
               </div>
             </div>
@@ -1158,7 +1247,7 @@
                         <span class="text-sm text-gray-300" id="editYtSelectedVideo">Choose a video...</span>
                         <i class="ti ti-chevron-down text-gray-400"></i>
                       </button>
-                      <div id="editYtVideoSelectorDropdown" class="hidden absolute z-10 mt-2 w-full bg-dark-700 rounded-lg border border-gray-600 shadow-lg">
+                      <div id="editYtVideoSelectorDropdown" class="hidden absolute z-50 mt-2 w-full bg-dark-700 rounded-lg border border-gray-600 shadow-lg">
                         <div class="p-2 border-b border-gray-600/50">
                           <div class="relative">
                             <input type="text" id="editYtVideoSearchInput" class="w-full bg-dark-800 text-white pl-8 pr-4 py-2 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-primary border border-gray-700" placeholder="Search videos...">
@@ -1260,17 +1349,16 @@
 
                   <div class="p-4 bg-dark-900/50 rounded-xl border border-gray-700/50 space-y-4">
                     <h4 class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Quality Settings</h4>
-                    <div class="grid grid-cols-2 gap-4">
-                      <div>
-                        <label class="text-xs text-gray-400 block mb-1">Resolution</label>
-                        <select id="editYtResolution" name="ytResolution" class="w-full h-[38px] px-3 bg-dark-700 border border-gray-600 rounded-lg text-sm focus:border-primary">
-                          <option value="original" selected>Original (Auto Detect)</option>
-                          <option value="720p">720p HD</option>
-                          <option value="1080p">1080p Full HD</option>
-                          <option value="1440p">1440p QHD</option>
-                          <option value="2160p">2160p 4K</option>
-                        </select>
-                      </div>
+                    <div>
+                      <label class="text-xs text-gray-400 block mb-1">Resolution</label>
+                      <select id="editYtResolution" name="ytResolution" class="w-full h-[38px] px-3 bg-dark-700 border border-gray-600 rounded-lg text-sm focus:border-primary">
+                        <option value="original" selected>Original (Auto Detect)</option>
+                        <option value="720p">720p HD</option>
+                        <option value="1080p">1080p Full HD</option>
+                        <option value="1440p">1440p QHD</option>
+                        <option value="2160p">2160p 4K</option>
+                      </select>
+                    </div>
                     <div id="editYtAdditionalQualitySettings" class="hidden space-y-4">
                       <div class="grid grid-cols-2 gap-4">
                         <div>
@@ -1336,16 +1424,22 @@
                     </label>
                   </div>
 
-                  <div id="editYtScheduleSettings" class="hidden grid grid-cols-1 sm:grid-cols-4 gap-4">
+                  <div id="editYtScheduleSettings" class="hidden grid grid-cols-1 sm:grid-cols-3 gap-3">
                     <div>
                       <label class="text-xs text-gray-400 block mb-1">Start Time</label>
-                      <input type="datetime-local" id="editYtScheduleStart" name="ytScheduleStart" class="w-full h-[42px] px-4 bg-dark-700 border border-gray-600 rounded-lg focus:border-primary focus:ring-1 focus:ring-primary text-sm [color-scheme:dark]">
+                      <input type="datetime-local" id="editYtScheduleStart" name="ytScheduleStart" class="w-full h-[42px] px-4 bg-dark-700 border border-gray-600 rounded-lg focus:border-primary focus:ring-1 focus:ring-primary text-sm ">
                     </div>
                     <div>
-                      <label class="text-xs text-gray-400 block mb-1">Duration</label>
+                      <label class="text-xs text-gray-500 block mb-1 font-semibold">Duration (Durasi)</label>
                       <div class="flex gap-2">
-                        <input type="number" id="editYtDurationHours" min="0" placeholder="Hrs" class="w-full h-[42px] px-2 bg-dark-700 border border-gray-600 rounded-lg focus:border-primary focus:ring-1 focus:ring-primary text-sm [color-scheme:dark]">
-                        <input type="number" id="editYtDurationMinutes" min="0" max="59" placeholder="Min" class="w-full h-[42px] px-2 bg-dark-700 border border-gray-600 rounded-lg focus:border-primary focus:ring-1 focus:ring-primary text-sm [color-scheme:dark]">
+                        <div class="flex-1 relative">
+                          <input type="number" id="editYtDurationHours" min="0" placeholder="0" class="w-full h-[40px] pl-3 pr-7 bg-white border border-gray-300 rounded-lg text-sm font-semibold">
+                          <span class="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-gray-400 font-bold pointer-events-none">Jam</span>
+                        </div>
+                        <div class="flex-1 relative">
+                          <input type="number" id="editYtDurationMinutes" min="0" max="59" placeholder="0" class="w-full h-[40px] pl-3 pr-7 bg-white border border-gray-300 rounded-lg text-sm font-semibold">
+                          <span class="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-gray-400 font-bold pointer-events-none">Mnt</span>
+                        </div>
                       </div>
                     </div>
                     <div>
@@ -1353,7 +1447,7 @@
                         <span>End Time</span>
                         <span id="editYtDurationBadge" class="ml-2 bg-gray-700 text-xs text-gray-300 px-2 py-0.5 rounded hidden">00:00</span>
                       </label>
-                      <input type="datetime-local" id="editYtScheduleEnd" name="ytScheduleEnd" class="w-full h-[42px] px-4 bg-dark-700 border border-gray-600 rounded-lg focus:border-primary focus:ring-1 focus:ring-primary text-sm [color-scheme:dark]">
+                      <input type="datetime-local" id="editYtScheduleEnd" name="ytScheduleEnd" class="w-full h-[42px] px-4 bg-dark-700 border border-gray-600 rounded-lg focus:border-primary focus:ring-1 focus:ring-primary text-sm ">
                     </div>
                   </div>
                 </div>
@@ -1821,6 +1915,10 @@
           if (memTotalMobile) memTotalMobile.textContent = '/ ' + formatMemory(data.memory.total).replace(' ', '');
           
           if (data.network) {
+            window.latestNetworkStats = data.network;
+            if (data.network.resetDay) {
+              updateResetBadge(data.network.resetDay);
+            }
             document.getElementById('upload-speed').textContent = data.network.uploadFormatted;
             document.getElementById('download-speed').textContent = data.network.downloadFormatted;
             const uploadMobile = document.getElementById('upload-speed-mobile');
@@ -1834,13 +1932,29 @@
             
             const totalUpload = document.getElementById('total-upload');
             const totalDownload = document.getElementById('total-download');
-            if (totalUpload) totalUpload.textContent = '↑ ' + (data.network.totalUploadFormatted || '0 B');
-            if (totalDownload) totalDownload.textContent = '↓ ' + (data.network.totalDownloadFormatted || '0 B');
+            const resetDayLabel = data.network.resetDay || 15;
+            const cycleTooltip = data.network.cycleStart && data.network.nextReset
+              ? `Siklus: ${data.network.cycleStart} s/d ${data.network.nextReset} (Reset tgl ${resetDayLabel})`
+              : `Reset setiap tanggal ${resetDayLabel}`;
+            if (totalUpload) {
+              totalUpload.textContent = '↑ ' + (data.network.totalUploadFormatted || '0 B');
+              totalUpload.title = `Total Upload (${cycleTooltip})`;
+            }
+            if (totalDownload) {
+              totalDownload.textContent = '↓ ' + (data.network.totalDownloadFormatted || '0 B');
+              totalDownload.title = `Total Download (${cycleTooltip})`;
+            }
             
             const totalUploadWide = document.getElementById('total-upload-wide');
             const totalDownloadWide = document.getElementById('total-download-wide');
-            if (totalUploadWide) totalUploadWide.textContent = '↑ ' + (data.network.totalUploadFormatted || '0 B');
-            if (totalDownloadWide) totalDownloadWide.textContent = '↓ ' + (data.network.totalDownloadFormatted || '0 B');
+            if (totalUploadWide) {
+              totalUploadWide.textContent = '↑ ' + (data.network.totalUploadFormatted || '0 B');
+              totalUploadWide.title = `Total Upload (${cycleTooltip})`;
+            }
+            if (totalDownloadWide) {
+              totalDownloadWide.textContent = '↓ ' + (data.network.totalDownloadFormatted || '0 B');
+              totalDownloadWide.title = `Total Download (${cycleTooltip})`;
+            }
           }         
           if (data.disk) {
             const diskUsagePercent = data.disk.usagePercent;
@@ -1966,6 +2080,110 @@
     
     updateSystemStats();
     setInterval(updateSystemStats, 5000);
+
+    function updateResetBadge(day) {
+      const b1 = document.getElementById('usage-badge-day');
+      const b2 = document.getElementById('usage-badge-day-wide');
+      if (b1) b1.textContent = day;
+      if (b2) b2.textContent = day;
+    }
+
+    function openNetworkUsageModal() {
+      const modal = document.getElementById('networkUsageModal');
+      if (!modal) return;
+      
+      const badgeDay = document.getElementById('usage-badge-day')?.textContent || '15';
+      const input = document.getElementById('modal-reset-day-input');
+      if (input) input.value = badgeDay.trim();
+      
+      const totalUpload = document.getElementById('total-upload')?.textContent || '↑ 0 B';
+      const totalDownload = document.getElementById('total-download')?.textContent || '↓ 0 B';
+      
+      document.getElementById('modal-total-upload').textContent = totalUpload;
+      document.getElementById('modal-total-download').textContent = totalDownload;
+      
+      if (window.latestNetworkStats && window.latestNetworkStats.cycleStart && window.latestNetworkStats.nextReset) {
+        document.getElementById('modal-cycle-info').textContent = 
+          `${window.latestNetworkStats.cycleStart} s/d ${window.latestNetworkStats.nextReset}`;
+      } else {
+        document.getElementById('modal-cycle-info').textContent = `Setiap tgl ${badgeDay.trim()}`;
+      }
+      
+      modal.classList.remove('hidden');
+    }
+
+    function closeNetworkUsageModal() {
+      const modal = document.getElementById('networkUsageModal');
+      if (modal) modal.classList.add('hidden');
+    }
+
+    async function saveNetworkResetDay(e) {
+      e.preventDefault();
+      const input = document.getElementById('modal-reset-day-input');
+      const day = parseInt(input.value);
+      if (isNaN(day) || day < 1 || day > 31) {
+        alert('Tanggal reset harus antara 1 sampai 31');
+        return;
+      }
+      const csrfToken = document.querySelector('input[name="_csrf"]')?.value || '<%= typeof csrfToken !== "undefined" ? csrfToken : "" %>';
+      const btn = document.getElementById('modal-save-reset-btn');
+      btn.disabled = true;
+      btn.innerHTML = '<i class="ti ti-loader animate-spin mr-1"></i> Menyimpan...';
+      
+      try {
+        const res = await fetch('/api/settings/network-reset-day', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+            ...(csrfToken ? { 'X-CSRF-Token': csrfToken } : {})
+          },
+          body: JSON.stringify({ reset_day: day, _csrf: csrfToken })
+        });
+        const data = await res.json();
+        if (data.success) {
+          updateResetBadge(day);
+          closeNetworkUsageModal();
+          updateSystemStats();
+          alert(`Tanggal reset pemakaian berhasil diubah ke tanggal ${day}`);
+        } else {
+          alert(data.message || 'Gagal menyimpan tanggal reset');
+        }
+      } catch (err) {
+        alert('Gagal menghubungi server: ' + err.message);
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="ti ti-check"></i> Simpan Tanggal';
+      }
+    }
+
+    async function manualResetNetworkUsage() {
+      if (!confirm('Apakah Anda yakin ingin me-reset statistik pemakaian kuota saat ini ke 0 B?')) {
+        return;
+      }
+      const csrfToken = document.querySelector('input[name="_csrf"]')?.value || '<%= typeof csrfToken !== "undefined" ? csrfToken : "" %>';
+      try {
+        const res = await fetch('/api/settings/reset-network-usage', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+            ...(csrfToken ? { 'X-CSRF-Token': csrfToken } : {})
+          },
+          body: JSON.stringify({ _csrf: csrfToken })
+        });
+        const data = await res.json();
+        if (data.success) {
+          closeNetworkUsageModal();
+          updateSystemStats();
+          alert('Statistik pemakaian berhasil di-reset ke 0 B');
+        } else {
+          alert(data.message || 'Gagal me-reset kuota');
+        }
+      } catch (err) {
+        alert('Gagal me-reset: ' + err.message);
+      }
+    }
     
     // Load YouTube Form Defaults from localStorage
     document.addEventListener('DOMContentLoaded', function() {
@@ -2247,9 +2465,10 @@
 
 
     function updateStreamCounters(streams) {
+      if (!Array.isArray(streams)) return;
       const liveStreams = streams.filter(stream => stream.status === 'live').length;
-      const desktopCounter = document.querySelector('.hidden.md\\:grid .bg-gray-800:nth-child(1) p.text-3xl');
-      const mobileCounter = document.querySelector('.grid.grid-cols-2.md\\:hidden .bg-gray-800:nth-child(1) p.text-xl');
+      const desktopCounter = document.getElementById('desktop-active-streams-counter') || document.querySelector('.hidden.md\\:grid .bg-gray-800:nth-child(1) p.text-3xl') || document.querySelector('.stat-card-violet p.text-3xl');
+      const mobileCounter = document.getElementById('mobile-active-streams-counter') || document.querySelector('.grid.grid-cols-2.md\\:hidden .bg-gray-800:nth-child(1) p.text-xl');
       if (desktopCounter) desktopCounter.textContent = liveStreams;
       if (mobileCounter) mobileCounter.textContent = liveStreams;
     }
@@ -2479,7 +2698,7 @@
             <button
               onclick="startStream('${streamId}')"
               id="action-btn-start-${streamId}-${view}"
-              class="${btnClass} bg-primary hover:bg-blue-600"
+              class="${btnClass} bg-emerald-600 hover:bg-emerald-700"
               title="Start now immediately">
               Start Now
             </button>
@@ -2491,7 +2710,7 @@
           <button
             onclick="startStream('${streamId}')"
             id="action-btn-${streamId}-${view}"
-            class="${btnClass} bg-primary hover:bg-blue-600">
+            class="${btnClass} bg-emerald-600 hover:bg-emerald-700">
             Start
           </button>
         `;

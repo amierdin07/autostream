@@ -13,13 +13,7 @@ const originalConsoleInfo = console.info;
 const originalConsoleDebug = console.debug;
 function getLocalTimestamp() {
   const now = new Date();
-  const pad = num => String(num).padStart(2, '0');
-  return now.getFullYear() +
-    '-' + pad(now.getMonth() + 1) +
-    '-' + pad(now.getDate()) +
-    ' ' + pad(now.getHours()) +
-    ':' + pad(now.getMinutes()) +
-    ':' + pad(now.getSeconds());
+  return now.toLocaleString("sv-SE", { timeZone: "Asia/Jakarta" }) + " WIB";
 }
 
 function writeToLogFile(level, ...args) {

@@ -12,9 +12,10 @@
   <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
   <link rel="preload" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.30.0/fonts/tabler-icons.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.30.0/tabler-icons.min.css">
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="stylesheet" href="/css/styles.css">
+  
   <script>
     tailwind.config = {
       darkMode: 'class',
@@ -25,26 +26,26 @@
         },
         extend: {
           colors: {
-            'primary': '#6366F1',
+            'primary': '#5C6BC0', 'coral': '#FA5B4A',
             'secondary': '#4F46E5',
             'dark': {
-              '900': '#121212',
-              '800': '#252525',
-              '700': '#2D2D2D',
-              '600': '#3D3D3D',
-              '500': '#6E6E6E',
-              '400': '#8F8F8F',
+              '900': '#0B0E1B',
+              '800': '#151B32',
+              '700': '#1C2340',
+              '600': '#293356',
+              '500': '#6E7997',
+              '400': '#8E98B0',
               '300': '#AFAFAF',
               '200': '#CFCFCF',
               '100': '#E5E5E5',
             },
             'gray': {
-              '900': '#121212',
-              '800': '#252525',
-              '700': '#2D2D2D',
-              '600': '#3D3D3D',
-              '500': '#6E6E6E',
-              '400': '#8F8F8F',
+              '900': '#0B0E1B',
+              '800': '#151B32',
+              '700': '#1C2340',
+              '600': '#293356',
+              '500': '#6E7997',
+              '400': '#8E98B0',
               '300': '#AFAFAF',
               '200': '#CFCFCF',
               '100': '#E5E5E5',
@@ -71,173 +72,7 @@
      }
    </script>
 
-<style id="theme-style">
-    /* Soft Warm Paper / Calm Slate Light Theme (Zero eye strain) */
-  html.light-mode { color-scheme: light; }
-  html.light-mode body { background-color: #ECEEF2 !important; color: #334155 !important; }
-  html.light-mode body.bg-dark-900,
-  html.light-mode .bg-dark-900 { background-color: #ECEEF2 !important; color: #1E293B !important; }
-  
-  /* Soft Muted Cards (Warm Slate White, not piercing white) */
-  html.light-mode .bg-dark-800 { 
-    background-color: #F8FAFC !important; 
-    color: #1E293B !important; 
-    border-color: #CBD5E1 !important; 
-    box-shadow: 0 4px 16px -2px rgba(15, 23, 42, 0.05) !important;
-  }
-  html.light-mode .bg-dark-700 { 
-    background-color: #E2E8F0 !important; 
-    color: #1E293B !important; 
-    border-color: #CBD5E1 !important; 
-  }
-  html.light-mode .bg-dark-600 { background-color: #CBD5E1 !important; color: #0F172A !important; }
-  
-  /* Text with comfortable contrast */
-  html.light-mode .text-white { color: #0F172A !important; }
-  html.light-mode .text-gray-300, html.light-mode .text-gray-200 { color: #334155 !important; }
-  html.light-mode .text-gray-400 { color: #64748B !important; }
-  html.light-mode .text-gray-500 { color: #64748B !important; }
-  html.light-mode .border-gray-700, html.light-mode .border-gray-600 { border-color: #CBD5E1 !important; }
-  
-  /* Stat Cards in Light Mode: Soft Violet Mist */
-  html.light-mode .stat-card-violet,
-  html.light-mode .bg-gray-800 { 
-    background: linear-gradient(135deg, #EDE9FE 0%, #E0E7FF 100%) !important; 
-    border: 1.5px solid #C4B5FD !important; 
-    box-shadow: 0 4px 15px rgba(124, 58, 237, 0.08) !important;
-  }
-  html.light-mode .stat-card-violet h3 { color: #5B21B6 !important; }
-  html.light-mode .stat-card-violet p,
-  html.light-mode .stat-card-violet span.font-bold { color: #2E1065 !important; }
-  html.light-mode .stat-card-violet .ti { color: #6D28D9 !important; }
-  html.light-mode .stat-card-violet .bg-dark-700 { background: #DDD6FE !important; border-color: #C4B5FD !important; }
-  
-  /* Inputs in Light Mode: Calm Slate */
-  html.light-mode input[type="text"], 
-  html.light-mode input[type="password"], 
-  html.light-mode input[type="email"], 
-  html.light-mode select, 
-  html.light-mode textarea { 
-    background-color: #F8FAFC !important; 
-    color: #0F172A !important; 
-    border-color: #CBD5E1 !important; 
-  }
-  html.light-mode input:focus, html.light-mode select:focus, html.light-mode textarea:focus {
-    border-color: #7C3AED !important;
-    box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.15) !important;
-  }
-  
-  html.light-mode tr:hover { background-color: rgba(124, 58, 237, 0.06) !important; }
-  html.light-mode .sidebar-icon { color: #64748B !important; }
-  html.light-mode .sidebar-icon:hover { background-color: #E0E7FF !important; color: #4338CA !important; }
-  html.light-mode .sidebar-icon.bg-primary { background: linear-gradient(135deg, #7C3AED 0%, #6D28D9 100%) !important; color: #FFFFFF !important; }
 
-  /* High-Impact Vivid Violet M-Banking Stat Cards (CPU, RAM, Disk, Streams) */
-  .stat-card-violet {
-    background: linear-gradient(135deg, #4C1D95 0%, #3B0764 50%, #2E1065 100%) !important;
-    border: 1.5px solid rgba(167, 139, 250, 0.45) !important;
-    border-radius: 20px !important;
-    box-shadow: 0 10px 30px -5px rgba(124, 58, 237, 0.4), inset 0 1px 1px rgba(233, 213, 255, 0.3) !important;
-    position: relative !important;
-    overflow: hidden !important;
-  }
-
-  .stat-card-violet::before {
-    content: "";
-    position: absolute;
-    top: -50%;
-    right: -20%;
-    width: 150px;
-    height: 150px;
-    background: radial-gradient(circle, rgba(168, 85, 247, 0.35) 0%, transparent 70%);
-    pointer-events: none;
-  }
-
-  .stat-card-violet h3 {
-    color: #E9D5FF !important;
-    font-size: 0.95rem !important;
-    font-weight: 600 !important;
-    letter-spacing: -0.01em !important;
-  }
-
-  .stat-card-violet p, .stat-card-violet span.font-bold {
-    color: #FAF5FF !important;
-  }
-
-  .stat-card-violet .bg-dark-700 {
-    background: rgba(124, 58, 237, 0.35) !important;
-    border: 1px solid rgba(196, 181, 253, 0.3) !important;
-    border-radius: 12px !important;
-  }
-
-  .stat-card-violet .ti {
-    color: #F5F3FF !important;
-  }
-
-  .stat-card-violet .bg-gray-700 {
-    background: rgba(30, 10, 60, 0.7) !important;
-    border: 1px solid rgba(167, 139, 250, 0.2) !important;
-  }
-
-  .stat-card-violet .bg-primary {
-    background: linear-gradient(90deg, #A855F7 0%, #EC4899 100%) !important;
-    box-shadow: 0 0 12px rgba(217, 70, 239, 0.6) !important;
-  }
-
-
-  /* 1. Live Pulsing Glowing Badge */
-  @keyframes pulseLiveGlow {
-    0%, 100% {
-      transform: scale(1);
-      box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7);
-    }
-    50% {
-      transform: scale(1.1);
-      box-shadow: 0 0 10px 4px rgba(239, 68, 68, 0.4);
-    }
-  }
-
-  .live-pulse-dot {
-    display: inline-block;
-    width: 7px;
-    height: 7px;
-    border-radius: 50%;
-    background-color: #EF4444;
-    animation: pulseLiveGlow 1.8s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-    will-change: transform, box-shadow;
-  }
-
-  /* 2. Micro-Zoom Smooth Squircle Thumbnails */
-  td .w-20.h-12, .aspect-video {
-    border-radius: 10px !important;
-    overflow: hidden !important;
-    border: 1px solid rgba(255, 255, 255, 0.08);
-  }
-
-  td .w-20.h-12 img {
-    transition: transform 0.25s cubic-bezier(0.2, 0.8, 0.2, 1);
-    will-change: transform;
-  }
-
-  tr:hover td .w-20.h-12 img {
-    transform: scale(1.08);
-  }
-
-  /* 3. Action Buttons Pill Micro-Interactions */
-  table td button, table td a {
-    transition: all 0.18s ease !important;
-  }
-
-  table td button:hover, table td a:hover {
-    transform: translateY(-1px);
-  }
-
-  /* 4. Smooth iOS Spring Modal Transitions */
-  #newStreamModal, #editStreamModal, #quick-notes-drawer {
-    transition: opacity 0.2s cubic-bezier(0.16, 1, 0.3, 1), transform 0.2s cubic-bezier(0.16, 1, 0.3, 1) !important;
-  }
-
-</style>
 <script>
   (function() {
     var savedTheme = localStorage.getItem("simastream_theme");
@@ -262,116 +97,457 @@
 </script>
 
 
-<style id="fintech-premium-style">
-  @import url("https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap");
+
+
+
+
+<style id="fastwork-pastel-style">
+  @import url("https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&display=swap");
+
+  /* ==========================================================================
+     Playful Healthcare / Fastwork Mobile Dashboard Aesthetic
+     Soft Airy Alabaster Background (#F7FAF9) • Clean Pure White Squircles
+     Hero Deep Teal Accent Card (#2D7A68) • Micro-Pastel Icon Boxes
+     Empuk Cloud Shadows • High Contrast Heading
+     ========================================================================== */
+
+  :root {
+    --fw-font: "Plus Jakarta Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    --fw-bg: #F5F8F7;
+    --fw-card: #FFFFFF;
+    --fw-teal: #2D7A68;
+    --fw-teal-dark: #225C4E;
+    --fw-teal-light: #E6F4F1;
+    --fw-text-title: #142028;
+    --fw-text-body: #4A5B66;
+    --fw-text-muted: #8899A6;
+    --fw-border: #E8EEF0;
+    --fw-shadow: 0 10px 28px -4px rgba(20, 32, 40, 0.05), 0 2px 8px -1px rgba(20, 32, 40, 0.03);
+    --fw-shadow-elevated: 0 16px 36px -6px rgba(45, 122, 104, 0.22);
+  }
 
   body, html {
-    font-family: "Plus Jakarta Sans", -apple-system, BlinkMacSystemFont, sans-serif !important;
-    letter-spacing: -0.015em;
+    font-family: var(--fw-font) !important;
+    letter-spacing: -0.01em !important;
+    -webkit-font-smoothing: antialiased;
+    font-weight: 600 !important; /* Base weight upgraded from 400 to 600 */
+    color: #0F172A !important;
   }
 
-  /* Deep Violet Dark Space Background */
-  body.bg-dark-900 {
-    background: #090714 !important;
-    color: #EDE9FE !important;
+  /* Universal text contrast and weight enhancement */
+  h1, h2, h3, h4, h5, h6, strong, b, .font-bold, .font-semibold {
+    font-weight: 800 !important;
+    color: #09101D !important;
   }
 
-  /* Squircle Radius */
-  .rounded-lg, .rounded-xl, .rounded-2xl {
-    border-radius: 18px !important;
+  span, p, a, div, td, th, label, button, input {
+    -webkit-font-smoothing: antialiased;
   }
 
-  /* Top Stat Cards: Pure Rich Deep Violet Gradient (Glass Effect) */
-  .bg-gray-800 {
-    background: linear-gradient(145deg, rgba(35, 20, 68, 0.85) 0%, rgba(20, 13, 45, 0.9) 100%) !important;
-    border: 1px solid rgba(139, 92, 246, 0.22) !important;
-    box-shadow: 0 8px 32px -4px rgba(109, 40, 217, 0.25), inset 0 1px 0 rgba(196, 181, 253, 0.1) !important;
-    border-radius: 20px !important;
+  /* 1. Global Page Background & Body */
+  body, html, body.bg-dark-900 {
+    background-color: var(--fw-bg) !important;
+    background: #F5F8F7 !important;
+    color: var(--fw-text-title) !important;
   }
 
-  /* General Cards & Sidebar */
-  .bg-dark-800 {
-    background: rgba(18, 14, 33, 0.88) !important;
-    border: 1px solid rgba(139, 92, 246, 0.15) !important;
-    border-radius: 20px !important;
-    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.4) !important;
+  /* 2. Top Header Navigation (Clean Glass Frosted) */
+  header, .lg\:hidden.fixed.top-0, nav[class*="bg-dark-800"] {
+    background: rgba(255, 255, 255, 0.92) !important;
+    backdrop-filter: blur(20px) !important;
+    -webkit-backdrop-filter: blur(20px) !important;
+    border-bottom: 1px solid var(--fw-border) !important;
+    box-shadow: 0 2px 12px rgba(20, 32, 40, 0.03) !important;
+    color: var(--fw-text-title) !important;
   }
 
-  .bg-dark-700 {
-    background: rgba(46, 28, 86, 0.5) !important;
-    border: 1px solid rgba(167, 139, 250, 0.18) !important;
-    border-radius: 14px !important;
+  /* 3. Sidebar (Clean Minimalist Dock) */
+  aside, .sidebar, aside.bg-dark-800, div.bg-dark-800.w-16, div.bg-dark-800.w-20 {
+    background: #FFFFFF !important;
+    border-right: 1px solid var(--fw-border) !important;
+    box-shadow: 2px 0 18px rgba(20, 32, 40, 0.03) !important;
   }
 
-  /* Sidebar Squircle Icons */
   .sidebar-icon {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    height: 3.2rem;
-    width: 3.2rem;
-    margin: 0.4rem auto;
-    border-radius: 14px !important;
-    transition: all 0.2s cubic-bezier(0.25, 1, 0.5, 1) !important;
-    color: #A78BFA !important;
+    border-radius: 18px !important;
+    background: transparent !important;
+    border: 1px solid transparent !important;
+    color: var(--fw-text-muted) !important;
+    transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1) !important;
   }
 
   .sidebar-icon:hover {
-    background: rgba(124, 58, 237, 0.2) !important;
-    color: #DDD6FE !important;
+    background: #EDF4F2 !important;
+    color: var(--fw-teal) !important;
     transform: translateY(-1px);
   }
 
   .sidebar-icon.bg-primary {
-    background: linear-gradient(135deg, #7C3AED 0%, #6D28D9 100%) !important;
-    color: #FFFFFF !important;
-    box-shadow: 0 4px 16px rgba(124, 58, 237, 0.5) !important;
+    background: #E6F4F1 !important;
+    border: 1.5px solid #B8E2D9 !important;
+    color: #2D7A68 !important;
+    box-shadow: 0 6px 16px rgba(45, 122, 104, 0.15) !important;
   }
 
-  /* Rich Violet Primary Buttons & Progress Bars */
-  button.bg-primary, a.bg-primary, .bg-primary {
-    background: linear-gradient(135deg, #8B5CF6 0%, #6D28D9 100%) !important;
-    box-shadow: 0 4px 16px rgba(124, 58, 237, 0.4) !important;
-    border-radius: 14px !important;
+  /* 4. Top KPI Cards — Playful Micro-Pastel Boxes + Hero Teal Card */
+  /* Common Card Base: Pure White Squircle with Empuk Shadow */
+  .stat-card-violet, .bg-gray-800 {
+    background: #FFFFFF !important;
+    border: 1px solid var(--fw-border) !important;
+    border-radius: 24px !important;
+    box-shadow: var(--fw-shadow) !important;
+    padding: 22px !important;
+    position: relative !important;
+    overflow: hidden !important;
+    transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.25s ease !important;
+  }
+
+  .stat-card-violet::before {
+    display: none !important;
+  }
+
+  .stat-card-violet:hover, .bg-gray-800:hover {
+    transform: translateY(-4px) !important;
+    box-shadow: 0 18px 36px -6px rgba(20, 32, 40, 0.08) !important;
+  }
+
+  .stat-card-violet h3 {
+    color: #475569 !important; /* darker muted for crisp readability */
+    font-size: 0.82rem !important;
+    font-weight: 800 !important; /* upgraded from 700 */
+    text-transform: uppercase !important;
+    letter-spacing: 0.05em !important;
+  }
+
+  .stat-card-violet p, 
+  .stat-card-violet p.text-3xl, 
+  .stat-card-violet span.font-bold {
+    color: #09101D !important; /* pure crisp dark */
+    font-weight: 900 !important; /* extra bold for numbers */
+    letter-spacing: -0.03em !important;
+  }
+
+  /* Micro-Pastel Squircle Icon Badges */
+  .stat-card-violet .w-10.h-10, 
+  .stat-card-violet .bg-dark-700 {
+    width: 44px !important;
+    height: 44px !important;
+    border-radius: 16px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    border: none !important;
+  }
+
+  /* === CARD 1: HERO ACTIVE STREAMS (Teal Accent Card from reference "My Appointment") === */
+  .stat-card-violet:nth-child(1) {
+    background: linear-gradient(145deg, #2D7A68 0%, #225C4E 100%) !important;
+    border: none !important;
+    box-shadow: var(--fw-shadow-elevated) !important;
+    color: #FFFFFF !important;
+  }
+  .stat-card-violet:nth-child(1) h3 {
+    color: #D1EBE5 !important;
+  }
+  .stat-card-violet:nth-child(1) p.text-3xl {
+    color: #FFFFFF !important;
+    font-size: 2.3rem !important;
+  }
+  .stat-card-violet:nth-child(1) .w-10.h-10 {
+    background: rgba(255, 255, 255, 0.2) !important;
+  }
+  .stat-card-violet:nth-child(1) .ti {
+    color: #FFFFFF !important;
+    font-size: 1.3rem !important;
+  }
+
+  /* === CARD 2: CPU USAGE (Pastel Lavender / Lilac) === */
+  .stat-card-violet:nth-child(2) .w-10.h-10 {
+    background: #F3EDFC !important; /* Soft Pastel Purple */
+  }
+  .stat-card-violet:nth-child(2) .ti {
+    color: #8B5CF6 !important;
+  }
+
+  /* === CARD 3: MEMORY (Pastel Sky / Ice Blue) === */
+  .stat-card-violet:nth-child(3) .w-10.h-10 {
+    background: #E8F3FD !important; /* Soft Pastel Sky */
+  }
+  .stat-card-violet:nth-child(3) .ti {
+    color: #0284C7 !important;
+  }
+
+  /* === CARD 4: DISK (Pastel Butter Yellow / Warm Peach) === */
+  .stat-card-violet:nth-child(4) .w-10.h-10 {
+    background: #FFF8E3 !important; /* Soft Pastel Yellow */
+  }
+  .stat-card-violet:nth-child(4) .ti {
+    color: #D97706 !important;
+  }
+
+  /* === CARD 5: INTERNET SPEED (Pastel Blush Pink / Coral) === */
+  .stat-card-violet:nth-child(5) .w-10.h-10 {
+    background: #FEEDEE !important; /* Soft Pastel Pink */
+  }
+  .stat-card-violet:nth-child(5) .ti {
+    color: #E11D48 !important;
+  }
+
+  /* Sleek Progress Bars */
+  .w-full.bg-gray-700:not(span), 
+  .stat-card-violet div.bg-gray-700 {
+    background: #EEF3F2 !important;
+    border-radius: 9999px !important;
+    height: 7px !important;
+    border: none !important;
+    overflow: hidden !important;
+  }
+
+  #cpu-bar, #memory-bar, #disk-bar-wide, #disk-bar {
+    background: linear-gradient(90deg, #2D7A68 0%, #4FA893 100%) !important;
+    border-radius: 9999px !important;
+    box-shadow: none !important;
+  }
+
+  /* Mobile Top Bar Pill */
+  .md\:hidden .stat-card-violet {
+    background: #FFFFFF !important;
+    border: 1px solid var(--fw-border) !important;
+    box-shadow: var(--fw-shadow) !important;
+  }
+
+  /* 5. Main Card Container (Streaming Status & Table Area) */
+  .bg-dark-800 {
+    background: #FFFFFF !important;
+    border: 1px solid var(--fw-border) !important;
+    border-radius: 28px !important;
+    box-shadow: var(--fw-shadow) !important;
+    color: var(--fw-text-title) !important;
+  }
+
+  .bg-dark-700 {
+    background: #F5F8F7 !important;
+    border: 1px solid var(--fw-border) !important;
+    border-radius: 16px !important;
+    color: var(--fw-text-title) !important;
+  }
+
+  .bg-dark-600 {
+    background: #EDF4F2 !important;
+    border-color: var(--fw-border) !important;
+    color: var(--fw-text-title) !important;
+  }
+
+  h1, h2, h3, h4, .text-white {
+    color: #09101D !important;
+    font-weight: 800 !important;
+  }
+
+  p, .text-gray-400, .text-gray-300, .text-gray-200 {
+    color: #334155 !important; /* deeper slate, no washed out gray */
     font-weight: 600 !important;
   }
 
-  .text-primary {
-    color: #A78BFA !important;
+  .text-gray-500 {
+    color: #475569 !important;
+    font-weight: 600 !important;
   }
 
-  /* Inputs: Deep Violet Tone (No stark white) */
-  input[type="text"], input[type="password"], input[type="email"], select, textarea {
-    border-radius: 14px !important;
-    border: 1px solid rgba(139, 92, 246, 0.25) !important;
-    background-color: #120E24 !important;
-    color: #EDE9FE !important;
+  .text-xs {
+    font-size: 0.78rem !important;
+    font-weight: 600 !important;
   }
 
-  input:focus, select:focus, textarea:focus {
-    border-color: #A78BFA !important;
-    box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.3) !important;
+  .text-sm {
+    font-size: 0.88rem !important;
+    font-weight: 600 !important;
   }
 
-  /* Table Banking Rows */
-  tbody tr:hover {
-    background: rgba(139, 92, 246, 0.08) !important;
+  /* 6. Streaming Status Table (Airy & Clean) */
+  table {
+    border-collapse: collapse !important;
+    width: 100% !important;
   }
 
-  /* Light Mode Preserved */
-  html.light-mode body.bg-dark-900 {
-    background: #F5F3FF !important;
-    color: #1E1B4B !important;
+  table thead, table thead.bg-gray-700, .bg-gray-700 {
+    background: #F8FAF9 !important;
+    border-bottom: 1.5px solid var(--fw-border) !important;
   }
-  html.light-mode .bg-gray-800 {
-    background: linear-gradient(145deg, #FFFFFF 0%, #F5F3FF 100%) !important;
-    border: 1px solid #DDD6FE !important;
-    box-shadow: 0 4px 14px rgba(109, 40, 217, 0.08) !important;
+
+  table thead tr th {
+    background: #F8FAF9 !important;
+    color: #475569 !important;
+    font-size: 0.76rem !important;
+    font-weight: 800 !important; /* bold crisp table headers */
+    letter-spacing: 0.05em !important;
+    text-transform: uppercase !important;
+    padding: 14px 16px !important;
+    border: none !important;
   }
-  html.light-mode .bg-dark-800 {
+
+  table tbody tr {
     background: #FFFFFF !important;
-    border: 1px solid #E5E7EB !important;
+    border-bottom: 1px solid #EAEFEF !important;
+    transition: background 0.15s ease !important;
+  }
+
+  table tbody tr:hover, 
+  tr.hover\:bg-dark-700\/50:hover {
+    background: #F4F8F7 !important;
+  }
+
+  table tbody tr td {
+    padding: 14px 16px !important;
+    color: #0F172A !important;
+    font-weight: 600 !important; /* solid legible font in rows */
+    border-bottom: 1px solid #EAEFEF !important;
+  }
+
+  /* Table stream title link */
+  table tbody tr td .truncate,
+  table tbody tr td span.font-medium,
+  table tbody tr td a {
+    font-weight: 700 !important;
+    color: #09101D !important;
+  }
+
+  td img, .aspect-video, td .w-20.h-12 {
+    border-radius: 12px !important;
+    border: 1px solid var(--fw-border) !important;
+    overflow: hidden !important;
+  }
+
+  /* 7. Action Buttons (Teal Pill Style from Reference) */
+  button.bg-primary, a.bg-primary, .btn-primary {
+    background: var(--fw-teal) !important;
+    color: #FFFFFF !important;
+    border: none !important;
+    border-radius: 9999px !important; /* Full Pill Button */
+    font-weight: 800 !important; /* Extra bold button text */
+    letter-spacing: 0.01em !important;
+    padding: 10px 22px !important;
+    box-shadow: 0 6px 18px rgba(45, 122, 104, 0.28) !important;
+    transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1) !important;
+  }
+
+  button.bg-primary:hover, a.bg-primary:hover {
+    background: var(--fw-teal-dark) !important;
+    transform: translateY(-1px);
+    box-shadow: 0 8px 22px rgba(45, 122, 104, 0.35) !important;
+  }
+
+  /* Start Button (Pastel Mint Pill) */
+  .bg-emerald-600, .bg-emerald-700 {
+    background: #10B981 !important;
+    color: #FFFFFF !important;
+    border: none !important;
+    border-radius: 9999px !important;
+    font-weight: 700 !important;
+    box-shadow: 0 4px 12px rgba(16, 185, 129, 0.25) !important;
+  }
+  .bg-emerald-600:hover, .bg-emerald-700:hover {
+    background: #059669 !important;
+  }
+
+  /* Stop Button (Blush Coral Pill) */
+  .bg-red-500, .bg-red-600 {
+    background: #F43F5E !important;
+    color: #FFFFFF !important;
+    border: none !important;
+    border-radius: 9999px !important;
+    font-weight: 700 !important;
+    box-shadow: 0 4px 12px rgba(244, 63, 94, 0.25) !important;
+  }
+  .bg-red-500:hover, .bg-red-600:hover {
+    background: #E11D48 !important;
+  }
+
+  /* 8. Status Pills & Badges (Soft Pastel Tint Pills) */
+  .bg-red-500\/10, .bg-red-900\/20 {
+    background: #FEEDEE !important;
+    color: #E11D48 !important;
+    border: 1px solid #FECDD3 !important;
+    border-radius: 9999px !important;
+    font-weight: 700 !important;
+    padding: 3px 10px !important;
+  }
+
+  .bg-green-500\/10, .bg-green-900\/20, .bg-emerald-500\/10 {
+    background: #E6F7F3 !important;
+    color: #059669 !important;
+    border: 1px solid #A7F3D0 !important;
+    border-radius: 9999px !important;
+    font-weight: 700 !important;
+    padding: 3px 10px !important;
+  }
+
+  .text-\[10px\].bg-dark-900, 
+  span.bg-dark-900,
+  span[class*="bg-dark-900"] {
+    background: #EEF3F2 !important;
+    color: var(--fw-text-body) !important;
+    border: 1px solid var(--fw-border) !important;
+    border-radius: 8px !important;
+  }
+
+  /* Schedule Time Tag */
+  .text-yellow-400, .text-amber-400 {
+    color: #D97706 !important;
+  }
+
+  /* 9. Form Inputs (Rounded Pill Style) */
+  input[type="text"], input[type="password"], input[type="email"], select, textarea {
+    background: #FFFFFF !important;
+    border: 1.5px solid var(--fw-border) !important;
+    border-radius: 14px !important;
+    color: var(--fw-text-title) !important;
+    padding: 9px 15px !important;
+    transition: all 0.2s ease !important;
+  }
+
+  input[type="text"]:focus, select:focus, textarea:focus {
+    border-color: var(--fw-teal) !important;
+    box-shadow: 0 0 0 3px rgba(45, 122, 104, 0.15) !important;
+    outline: none !important;
+  }
+
+  /* Dropdown Menus */
+  .dropdown-menu, [id*="Dropdown"], [id*="dropdown"] {
+    background: #FFFFFF !important;
+    border: 1px solid var(--fw-border) !important;
+    border-radius: 18px !important;
+    box-shadow: 0 18px 40px -4px rgba(20, 32, 40, 0.12) !important;
+    color: var(--fw-text-title) !important;
+  }
+
+  .hover\:bg-dark-600:hover, .hover\:bg-dark-700:hover {
+    background: #F2F7F6 !important;
+    color: var(--fw-teal) !important;
+  }
+
+  /* 10. Modals & Drawers */
+  .modal-container, #newStreamModal .modal-container, #editStreamModal .modal-container, #quick-notes-drawer {
+    background: #FFFFFF !important;
+    border: 1px solid var(--fw-border) !important;
+    border-radius: 28px !important;
+    box-shadow: 0 24px 60px -12px rgba(20, 32, 40, 0.25) !important;
+    color: var(--fw-text-title) !important;
+  }
+
+  /* 11. Clean Minimal Scrollbar */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: #CBD5E1;
+    border-radius: 9999px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: #94A3B8;
   }
 </style>
 
@@ -865,6 +1041,299 @@
   #mobile-notification-popup.hidden {
     display: none !important;
   }
+
+  /* ==========================================================================
+     Modal Forms & Input Refinements (Zero Clipping, High Contrast)
+     ========================================================================== */
+  .modal-container {
+    background: #FFFFFF !important;
+    border: 1px solid var(--fw-border) !important;
+    border-radius: 24px !important;
+    box-shadow: 0 25px 50px -12px rgba(15, 23, 42, 0.25) !important;
+    color: #0F172A !important;
+  }
+
+  .modal-container h3, 
+  .modal-container h4, 
+  .modal-container label {
+    color: #1E293B !important;
+    font-weight: 700 !important;
+  }
+
+  .modal-container .border-b, 
+  .modal-container .border-t, 
+  .modal-container .border-gray-700 {
+    border-color: #E2E8F0 !important;
+  }
+
+  /* Inner Sub-cards (Quality Settings, Channel Preview) in Modals */
+  .modal-container .bg-dark-900\/50,
+  .modal-container .bg-dark-900,
+  .modal-container div[class*="bg-dark-900"] {
+    background: #F8FAFC !important;
+    border: 1px solid #E2E8F0 !important;
+    border-radius: 16px !important;
+  }
+
+  .modal-container .bg-dark-700 {
+    background: #FFFFFF !important;
+    border: 1.5px solid #CBD5E1 !important;
+    border-radius: 10px !important;
+    color: #0F172A !important;
+  }
+
+  /* Form Inputs, Selects, Datetime-local, and Number fields */
+  .modal-container input[type="text"],
+  .modal-container input[type="number"],
+  .modal-container input[type="datetime-local"],
+  .modal-container select,
+  .modal-container textarea {
+    background: #FFFFFF !important;
+    border: 1.5px solid #CBD5E1 !important;
+    border-radius: 10px !important;
+    color: #0F172A !important;
+    color-scheme: light !important;
+    font-weight: 600 !important;
+    font-size: 0.84rem !important;
+    padding: 7px 11px !important;
+    min-height: 40px !important;
+    box-sizing: border-box !important;
+  }
+
+  .modal-container input[type="datetime-local"] {
+    min-width: 175px !important;
+    font-size: 0.8rem !important;
+    padding: 6px 8px !important;
+  }
+
+  .modal-container input[type="number"] {
+    font-size: 0.84rem !important;
+    padding: 6px 8px !important;
+  }
+
+  .modal-container input:focus,
+  .modal-container select:focus,
+  .modal-container textarea:focus {
+    border-color: #2D7A68 !important;
+    box-shadow: 0 0 0 3px rgba(45, 122, 104, 0.18) !important;
+    outline: none !important;
+  }
+
+  /* Quality Settings Title */
+  .modal-container h4.uppercase {
+    color: #475569 !important;
+    font-size: 0.78rem !important;
+    font-weight: 800 !important;
+    letter-spacing: 0.05em !important;
+  }
+
+  /* Resolution Select */
+  #ytResolution, #editYtResolution {
+    font-size: 0.82rem !important;
+    padding: 6px 10px !important;
+    min-width: 170px !important;
+    white-space: nowrap !important;
+  }
+
+  /* Server Time Badge */
+  #ytServerTimeDisplay, #editYtServerTimeDisplay {
+    background: #E6F4F1 !important;
+    color: #2D7A68 !important;
+    border: 1px solid #B8E2D9 !important;
+    border-radius: 6px !important;
+    font-size: 0.7rem !important;
+    font-weight: 700 !important;
+    padding: 2px 7px !important;
+    display: inline-block !important;
+    white-space: nowrap !important;
+  }
+
+  /* Thumbnail upload box */
+  .modal-container div[onclick*="Thumbnail"] {
+    background: #F8FAFC !important;
+    border: 2px dashed #CBD5E1 !important;
+    border-radius: 14px !important;
+    transition: all 0.2s ease !important;
+  }
+  .modal-container div[onclick*="Thumbnail"]:hover {
+    border-color: #2D7A68 !important;
+    background: #F0FDF4 !important;
+  }
+
+  /* Cancel & Close button in Modal */
+  .modal-container button[onclick*="close"] i,
+  .modal-container button[onclick*="close"] {
+    color: #64748B !important;
+  }
+  .modal-container button[onclick*="close"]:hover {
+    color: #0F172A !important;
+  }
+
+  /* Tag Container */
+  #ytTagsContainer, #editYtTagsContainer {
+    background: #FFFFFF !important;
+    border: 1.5px solid #CBD5E1 !important;
+    border-radius: 10px !important;
+  }
+
+  #ytTagsContainer input, #editYtTagsContainer input {
+    color: #0F172A !important;
+    border: none !important;
+    background: transparent !important;
+  }
+
+
+  /* Pin modal header and footer, scroll body only */
+  #newStreamModal .modal-container,
+  #editStreamModal .modal-container {
+    max-height: calc(100vh - 48px) !important;
+    height: auto !important;
+    display: flex !important;
+    flex-direction: column !important;
+    overflow: hidden !important;
+    background: #FFFFFF !important;
+  }
+
+  #newStreamModal .modal-container > div:first-child,
+  #editStreamModal .modal-container > div:first-child {
+    flex-shrink: 0 !important;
+    background: #FFFFFF !important;
+    border-bottom: 1.5px solid #E2E8F0 !important;
+  }
+
+  #newStreamModal .modal-container > div.overflow-y-auto,
+  #editStreamModal .modal-container > div.overflow-y-auto {
+    flex: 1 1 auto !important;
+    min-height: 0 !important;
+    overflow-y: auto !important;
+    padding-top: 18px !important;
+    padding-bottom: 20px !important;
+  }
+
+  #newStreamModal .modal-container > div:last-child,
+  #editStreamModal .modal-container > div:last-child {
+    flex-shrink: 0 !important;
+    background: #F8FAFC !important;
+    border-top: 1.5px solid #E2E8F0 !important;
+    padding: 14px 24px !important;
+  }
+
+  /* Footer action buttons */
+  #newStreamModal button[type="submit"],
+  #editStreamModal button[type="submit"] {
+    background: #2D7A68 !important;
+    color: #FFFFFF !important;
+    font-weight: 800 !important;
+    border-radius: 9999px !important;
+    padding: 9px 24px !important;
+    box-shadow: 0 4px 14px rgba(45, 122, 104, 0.3) !important;
+  }
+  #newStreamModal button[type="submit"]:hover,
+  #editStreamModal button[type="submit"]:hover {
+    background: #225C4E !important;
+  }
+
+  /* Badge styling */
+  #ytServerTimeDisplay, #editYtServerTimeDisplay {
+    background: #E6F4F1 !important;
+    color: #115E59 !important;
+    border: 1px solid #99F6E4 !important;
+    border-radius: 6px !important;
+    font-size: 0.72rem !important;
+    font-weight: 800 !important;
+    padding: 2px 8px !important;
+    display: inline-block !important;
+    white-space: nowrap !important;
+  }
+
+  #ytDurationBadge, #editYtDurationBadge {
+    background: #E6F4F1 !important;
+    color: #115E59 !important;
+    border: 1px solid #99F6E4 !important;
+    border-radius: 6px !important;
+    font-size: 0.72rem !important;
+    font-weight: 800 !important;
+    padding: 2px 6px !important;
+    display: inline-block !important;
+    margin-left: 6px !important;
+  }
+
+
+  /* Modal Container Pinning and Clean Scrolling */
+  #newStreamModal .modal-container,
+  #editStreamModal .modal-container {
+    max-height: 88vh !important;
+    display: flex !important;
+    flex-direction: column !important;
+    overflow: hidden !important;
+    background: #FFFFFF !important;
+    border-radius: 24px !important;
+    border: 1px solid var(--fw-border) !important;
+    box-shadow: 0 25px 50px -12px rgba(15, 23, 42, 0.25) !important;
+  }
+
+  #newStreamModal .modal-container > div:first-child,
+  #editStreamModal .modal-container > div:first-child {
+    flex-shrink: 0 !important;
+    background: #FFFFFF !important;
+    border-bottom: 1px solid #E2E8F0 !important;
+    padding: 16px 24px !important;
+  }
+
+  #newStreamModal .modal-container > div.overflow-y-auto,
+  #editStreamModal .modal-container > div.overflow-y-auto {
+    flex: 1 1 auto !important;
+    min-height: 0 !important;
+    overflow-y: auto !important;
+    overflow-x: hidden !important; /* Zero horizontal scrollbar */
+    padding: 20px 24px !important;
+  }
+
+  #newStreamModal .modal-container > div:last-child,
+  #editStreamModal .modal-container > div:last-child {
+    flex-shrink: 0 !important;
+    background: #F8FAFC !important;
+    border-top: 1px solid #E2E8F0 !important;
+    padding: 14px 24px !important;
+    display: flex !important;
+    justify-content: flex-end !important;
+    align-items: center !important;
+    gap: 12px !important;
+  }
+
+  /* Badge styling: Never collapsed */
+  #ytServerTimeDisplay, #editYtServerTimeDisplay {
+    background: #E6F4F1 !important;
+    color: #0D5C4B !important;
+    border: 1px solid #99F6E4 !important;
+    border-radius: 6px !important;
+    font-size: 0.72rem !important;
+    font-weight: 800 !important;
+    padding: 3px 8px !important;
+    display: inline-block !important;
+    white-space: nowrap !important;
+    height: auto !important;
+    min-height: 22px !important;
+    line-height: 1.4 !important;
+    overflow: visible !important;
+  }
+
+  #ytDurationBadge, #editYtDurationBadge {
+    background: #E6F4F1 !important;
+    color: #0D5C4B !important;
+    border: 1px solid #99F6E4 !important;
+    border-radius: 6px !important;
+    font-size: 0.72rem !important;
+    font-weight: 800 !important;
+    padding: 2px 7px !important;
+    display: inline-block !important;
+    margin-left: 6px !important;
+    height: auto !important;
+    min-height: 20px !important;
+    line-height: 1.4 !important;
+    overflow: visible !important;
+  }
+
 </style>
 <script>
   document.addEventListener('DOMContentLoaded', () => {

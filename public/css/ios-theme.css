@@ -1,0 +1,234 @@
+
+/* ==========================================================================
+   iOS 18 / Apple HIG Glassmorphism & Liquid Design System for AutoStream
+   ========================================================================== */
+
+:root {
+  --ios-blur: blur(24px) saturate(180%);
+  --ios-blur-subtle: blur(16px) saturate(160%);
+  --ios-radius-sm: 12px;
+  --ios-radius-md: 18px;
+  --ios-radius-lg: 24px;
+  --ios-radius-pill: 9999px;
+  --ios-spring: cubic-bezier(0.25, 1, 0.5, 1);
+  --ios-spring-snappy: cubic-bezier(0.16, 1, 0.3, 1);
+  --ios-shadow-card: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+  --ios-shadow-float: 0 20px 48px -8px rgba(0, 0, 0, 0.55);
+}
+
+/* System-level iOS Typography & Smooth Scrolling */
+html, body {
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Plus Jakarta Sans", system-ui, sans-serif !important;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  scroll-behavior: smooth;
+  letter-spacing: -0.015em;
+}
+
+/* iOS OLED Deep Dark Background with subtle ambient glow */
+body.bg-dark-900 {
+  background: radial-gradient(circle at 50% 0%, #15102a 0%, #080612 60%, #030208 100%) !important;
+  background-attachment: fixed !important;
+  color: #F5F5F7 !important;
+}
+
+/* ==========================================================================
+   iOS Frosted Glass Surfaces (Liquid Glassmorphism)
+   ========================================================================== */
+
+/* Main Card Containers (Tables, Content Boxes) */
+.bg-dark-800 {
+  background: rgba(26, 21, 48, 0.65) !important;
+  backdrop-filter: var(--ios-blur) !important;
+  -webkit-backdrop-filter: var(--ios-blur) !important;
+  border: 1px solid rgba(255, 255, 255, 0.12) !important;
+  border-radius: var(--ios-radius-lg) !important;
+  box-shadow: var(--ios-shadow-card), inset 0 1px 1px 0 rgba(255, 255, 255, 0.15) !important;
+}
+
+/* Nested Surfaces / Inner Controls */
+.bg-dark-700 {
+  background: rgba(40, 32, 70, 0.55) !important;
+  backdrop-filter: var(--ios-blur-subtle) !important;
+  -webkit-backdrop-filter: var(--ios-blur-subtle) !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  border-radius: var(--ios-radius-md) !important;
+}
+
+/* iOS Top KPI Widget Cards (Stat Cards) */
+.stat-card-violet, .bg-gray-800 {
+  background: linear-gradient(135deg, rgba(88, 28, 135, 0.45) 0%, rgba(46, 16, 101, 0.6) 100%) !important;
+  backdrop-filter: var(--ios-blur) !important;
+  -webkit-backdrop-filter: var(--ios-blur) !important;
+  border: 1px solid rgba(192, 132, 252, 0.3) !important;
+  border-radius: var(--ios-radius-lg) !important;
+  box-shadow: 0 12px 36px -6px rgba(124, 58, 237, 0.35), inset 0 1px 1px rgba(255, 255, 255, 0.3) !important;
+  transition: transform 0.25s var(--ios-spring), box-shadow 0.25s var(--ios-spring) !important;
+}
+
+.stat-card-violet:hover, .bg-gray-800:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 16px 42px -4px rgba(124, 58, 237, 0.45), inset 0 1px 2px rgba(255, 255, 255, 0.4) !important;
+}
+
+/* ==========================================================================
+   iOS Floating Glass Sidebar & Navigation
+   ========================================================================== */
+.sidebar, nav[class*="bg-dark"], aside {
+  background: rgba(14, 10, 28, 0.75) !important;
+  backdrop-filter: var(--ios-blur) !important;
+  -webkit-backdrop-filter: var(--ios-blur) !important;
+  border-right: 1px solid rgba(255, 255, 255, 0.08) !important;
+}
+
+/* iOS App Icon Style for Sidebar */
+.sidebar-icon {
+  border-radius: 16px !important;
+  background: rgba(255, 255, 255, 0.04) !important;
+  border: 1px solid rgba(255, 255, 255, 0.06) !important;
+  color: #D1D5DB !important;
+  transition: all 0.25s var(--ios-spring) !important;
+}
+
+.sidebar-icon:hover {
+  background: rgba(255, 255, 255, 0.12) !important;
+  border-color: rgba(255, 255, 255, 0.2) !important;
+  color: #FFFFFF !important;
+  transform: scale(1.05);
+}
+
+.sidebar-icon.bg-primary {
+  background: linear-gradient(135deg, #0A84FF 0%, #0066CC 100%) !important; /* iOS Apple Blue */
+  color: #FFFFFF !important;
+  border: 1px solid rgba(255, 255, 255, 0.3) !important;
+  box-shadow: 0 6px 20px rgba(10, 132, 255, 0.45) !important;
+}
+
+/* ==========================================================================
+   iOS Squircle Buttons & Micro-Interactions (Tactile Haptic Feel)
+   ========================================================================== */
+
+/* Primary Action Buttons */
+button.bg-primary, a.bg-primary, .btn-primary {
+  background: linear-gradient(135deg, #0A84FF 0%, #0066CC 100%) !important;
+  border-radius: var(--ios-radius-md) !important;
+  border: 1px solid rgba(255, 255, 255, 0.2) !important;
+  box-shadow: 0 4px 18px rgba(10, 132, 255, 0.35) !important;
+  font-weight: 600 !important;
+  transition: all 0.2s var(--ios-spring) !important;
+}
+
+button.bg-primary:active, a.bg-primary:active {
+  transform: scale(0.96) !important;
+  box-shadow: 0 2px 8px rgba(10, 132, 255, 0.25) !important;
+}
+
+/* Start Button (iOS Green) */
+.bg-emerald-600, .bg-emerald-700 {
+  background: linear-gradient(135deg, #30D158 0%, #248A3D 100%) !important; /* iOS Apple Green */
+  border-radius: 12px !important;
+  border: 1px solid rgba(255, 255, 255, 0.25) !important;
+  box-shadow: 0 4px 14px rgba(48, 209, 88, 0.35) !important;
+  transition: all 0.18s var(--ios-spring) !important;
+}
+.bg-emerald-600:active, .bg-emerald-700:active {
+  transform: scale(0.95) !important;
+}
+
+/* Stop Button (iOS Red) */
+.bg-red-500, .bg-red-600 {
+  background: linear-gradient(135deg, #FF453A 0%, #D70015 100%) !important; /* iOS Apple Red */
+  border-radius: 12px !important;
+  border: 1px solid rgba(255, 255, 255, 0.25) !important;
+  box-shadow: 0 4px 14px rgba(255, 69, 58, 0.35) !important;
+  transition: all 0.18s var(--ios-spring) !important;
+}
+.bg-red-500:active, .bg-red-600:active {
+  transform: scale(0.95) !important;
+}
+
+/* Yellow / Warning (iOS Orange / Amber) */
+.bg-yellow-500, .bg-yellow-600 {
+  background: linear-gradient(135deg, #FF9F0A 0%, #C97800 100%) !important;
+  border-radius: 12px !important;
+  box-shadow: 0 4px 14px rgba(255, 159, 10, 0.35) !important;
+}
+
+/* ==========================================================================
+   iOS Form Controls & Inputs (Smooth Squircle Textfields)
+   ========================================================================== */
+input[type="text"], input[type="password"], input[type="email"], select, textarea {
+  border-radius: var(--ios-radius-md) !important;
+  background: rgba(255, 255, 255, 0.06) !important;
+  border: 1px solid rgba(255, 255, 255, 0.14) !important;
+  color: #FFFFFF !important;
+  padding: 10px 14px !important;
+  backdrop-filter: var(--ios-blur-subtle) !important;
+  -webkit-backdrop-filter: var(--ios-blur-subtle) !important;
+  transition: all 0.2s var(--ios-spring) !important;
+}
+
+input:focus, select:focus, textarea:focus {
+  background: rgba(255, 255, 255, 0.1) !important;
+  border-color: #0A84FF !important;
+  box-shadow: 0 0 0 4px rgba(10, 132, 255, 0.25) !important;
+  outline: none !important;
+}
+
+/* Dropdowns / Action Sheets */
+.dropdown-menu, [id*="Dropdown"], [id*="dropdown"] {
+  background: rgba(28, 22, 52, 0.92) !important;
+  backdrop-filter: var(--ios-blur) !important;
+  -webkit-backdrop-filter: var(--ios-blur) !important;
+  border: 1px solid rgba(255, 255, 255, 0.18) !important;
+  border-radius: var(--ios-radius-lg) !important;
+  box-shadow: var(--ios-shadow-float) !important;
+}
+
+/* ==========================================================================
+   iOS Modals & Dialogs (Apple Sheet Presentation)
+   ========================================================================== */
+.modal-container, #newStreamModal > div, #editStreamModal > div {
+  background: rgba(26, 20, 50, 0.88) !important;
+  backdrop-filter: var(--ios-blur) !important;
+  -webkit-backdrop-filter: var(--ios-blur) !important;
+  border: 1px solid rgba(255, 255, 255, 0.18) !important;
+  border-radius: 28px !important;
+  box-shadow: var(--ios-shadow-float) !important;
+}
+
+/* iOS Status Pills */
+span[class*="rounded-full"] {
+  border-radius: var(--ios-radius-pill) !important;
+  font-weight: 600 !important;
+  letter-spacing: 0.02em !important;
+}
+
+/* Soft iOS Table Row Transitions */
+tr.hover\:bg-dark-700\/50:hover, tr:hover {
+  background-color: rgba(255, 255, 255, 0.05) !important;
+  transition: background-color 0.15s ease !important;
+}
+
+/* iOS Squircle Thumbnails */
+td img, .aspect-video, td .w-20.h-12 {
+  border-radius: 12px !important;
+  border: 1px solid rgba(255, 255, 255, 0.12) !important;
+}
+
+/* iOS Smooth Scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 10px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.35);
+}
+

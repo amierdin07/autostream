@@ -925,8 +925,10 @@ class AutoliveService {
   static getFullOrderForRound(seriesId, roundNumber, itemCount) {
     if (itemCount <= 1) return [0];
     
-    // Always return sequential order for all rounds to play slots 1 to N consistently
-    return Array.from({ length: itemCount }, (_, i) => i);
+    const items = Array.from({ length: itemCount }, (_, i) => i);
+    // Shuffle slots for each round uniquely using seriesId + roundNumber as seed
+    const seed = hashCode(`${seriesId}_round_${roundNumber}`);
+    return seededShuffle(items, seed);
   }
 
   static getItemForGlobalIndex(series, items, globalIndex) {

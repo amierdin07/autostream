@@ -111,7 +111,7 @@
       </div>
       <div class="flex items-center gap-1.5">
         <% if (rotation.status === 'inactive' || rotation.status === 'paused' || rotation.status === 'completed') { %>
-        <button onclick="activateRotation('<%= rotation.id %>')" class="px-2.5 py-1 text-white text-[10px] font-medium rounded transition-colors bg-primary hover:bg-blue-600">Start</button>
+        <button onclick="activateRotation('<%= rotation.id %>')" class="px-2.5 py-1 text-white text-[10px] font-medium rounded transition-colors bg-emerald-600 hover:bg-emerald-700">Start</button>
         <% } else if (rotation.status === 'active') { %>
         <button onclick="stopRotation('<%= rotation.id %>')" class="px-2.5 py-1 text-white text-[10px] font-medium rounded transition-colors bg-red-500 hover:bg-red-600">Stop</button>
         <% } %>
@@ -250,7 +250,7 @@
           <td class="px-6 py-4 whitespace-nowrap text-right">
             <div class="flex items-center justify-end space-x-2">
               <% if (rotation.status === 'inactive' || rotation.status === 'paused' || rotation.status === 'completed') { %>
-              <button onclick="activateRotation('<%= rotation.id %>')" class="inline-flex items-center px-2.5 py-1.5 text-white text-xs font-medium rounded transition-colors bg-primary hover:bg-blue-600">
+              <button onclick="activateRotation('<%= rotation.id %>')" class="inline-flex items-center px-2.5 py-1.5 text-white text-xs font-medium rounded transition-colors bg-emerald-600 hover:bg-emerald-700">
                 Start
               </button>
               <% } else if (rotation.status === 'active') { %>

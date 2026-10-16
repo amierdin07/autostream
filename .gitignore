@@ -16,3 +16,8 @@ db/*.sqlite3
 *.log
 temp/
 speedtest.py
+*.bak
+*.bak/
+views.bak/
+public/css.bak/
+db/network_usage.json

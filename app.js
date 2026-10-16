@@ -1027,6 +1027,7 @@ app.get('/settings', isAuthenticated, async (req, res) => {
       vpsExpiryDate: vpsExpiryDate,
       telegramBotToken: telegramBotToken,
       telegramChatId: telegramChatId,
+      networkResetDay: systemMonitor.getResetDay ? systemMonitor.getResetDay() : 15,
       success: req.query.success || null,
       error: req.query.error || null,
       activeTab: req.query.activeTab || null
@@ -2499,6 +2500,46 @@ app.post('/api/settings/telegram', isAuthenticated, async (req, res) => {
   } catch (error) {
     console.error('Error saving Telegram settings:', error);
     return res.redirect('/settings?error=Failed to save Telegram settings&activeTab=vps');
+  }
+});
+
+app.post('/api/settings/network-reset-day', isAuthenticated, async (req, res) => {
+  try {
+    const { reset_day } = req.body;
+    const day = parseInt(reset_day);
+    if (isNaN(day) || day < 1 || day > 31) {
+      if (req.xhr || req.headers.accept?.includes('json')) {
+        return res.status(400).json({ success: false, message: 'Tanggal reset harus antara 1 sampai 31' });
+      }
+      return res.redirect('/settings?error=Tanggal reset harus antara 1 sampai 31&activeTab=vps');
+    }
+    const result = systemMonitor.setResetDay(day);
+    if (req.xhr || req.headers.accept?.includes('json')) {
+      return res.json({ success: true, message: `Tanggal reset pemakaian berhasil diubah ke tanggal ${day}`, ...result });
+    }
+    return res.redirect(`/settings?success=Tanggal reset data pemakaian berhasil diubah ke tanggal ${day}&activeTab=vps`);
+  } catch (error) {
+    console.error('Error saving network reset day:', error);
+    if (req.xhr || req.headers.accept?.includes('json')) {
+      return res.status(500).json({ success: false, message: 'Gagal mengubah tanggal reset' });
+    }
+    return res.redirect('/settings?error=Gagal mengubah tanggal reset&activeTab=vps');
+  }
+});
+
+app.post('/api/settings/reset-network-usage', isAuthenticated, async (req, res) => {
+  try {
+    const result = systemMonitor.resetUsageNow();
+    if (req.xhr || req.headers.accept?.includes('json')) {
+      return res.json({ success: true, message: 'Data pemakaian jaringan berhasil di-reset ke 0 B' });
+    }
+    return res.redirect('/settings?success=Data pemakaian jaringan berhasil di-reset ke 0 B&activeTab=vps');
+  } catch (error) {
+    console.error('Error resetting network usage:', error);
+    if (req.xhr || req.headers.accept?.includes('json')) {
+      return res.status(500).json({ success: false, message: 'Gagal me-reset data pemakaian' });
+    }
+    return res.redirect('/settings?error=Gagal me-reset data pemakaian&activeTab=vps');
   }
 });
 
@@ -5225,6 +5266,35 @@ app.get('/api/autolive', isAuthenticated, async (req, res) => {
   }
 });
 
+app.get('/api/autolive/gallery-thumbnails', isAuthenticated, (req, res) => {
+  try {
+    const fs = require('fs');
+    const path = require('path');
+    const thumbDir = path.join(__dirname, 'public', 'uploads', 'thumbnails');
+    if (!fs.existsSync(thumbDir)) {
+      return res.json({ success: true, thumbnails: [] });
+    }
+    const files = fs.readdirSync(thumbDir)
+      .filter(f => /\.(jpe?g|png|webp)$/i.test(f) && !f.startsWith('thumb-'))
+      .sort((a, b) => {
+        const sa = fs.statSync(path.join(thumbDir, a)).mtimeMs;
+        const sb = fs.statSync(path.join(thumbDir, b)).mtimeMs;
+        return sb - sa;
+      })
+      .slice(0, 50);
+
+    res.json({
+      success: true,
+      thumbnails: files.map(f => ({
+        name: f,
+        path: '/uploads/thumbnails/' + f
+      }))
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 app.get('/api/autolive/:id', isAuthenticated, async (req, res) => {
   try {
     const Autolive = require('./models/Autolive');
@@ -5392,6 +5462,26 @@ app.get('/api/autolive/:id/download-schedule', isAuthenticated, async (req, res)
   } catch (error) {
     console.error('Error downloading autolive schedule:', error);
     res.status(500).send('Internal Server Error: ' + error.message);
+  }
+});
+
+app.post('/api/autolive/generate-titles-ai', isAuthenticated, async (req, res) => {
+  try {
+    const geminiService = require('./services/geminiService');
+    const { thumbnail_path, count, guidance, language, video_name } = req.body;
+
+    const result = await geminiService.generateTitlesFromImage({
+      imagePath: thumbnail_path || null,
+      count: parseInt(count) || 10,
+      guidance: guidance || '',
+      language: language || 'id',
+      videoName: video_name || ''
+    });
+
+    res.json(result);
+  } catch (error) {
+    console.error('[Gemini AI] Error generating titles:', error);
+    res.status(500).json({ success: false, error: error.message || 'Gagal membuat judul dengan AI' });
   }
 });
 
